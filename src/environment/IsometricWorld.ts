@@ -332,19 +332,39 @@ export class IsometricWorld {
   }
 
   /**
-   * Downward raycast targeting only walkable terrain surfaces (Floor, Plaza, Platforms, Sky Platforms, Ramps).
+   * Downward raycast targeting only walkable terrain surfaces.
+   * Probes strictly from the character's current elevation down, preventing false hits on elevated sky platforms above.
    */
-  public getTerrainHeight(x: number, z: number, fromY: number = 2.0): number {
-    const startY = Math.max(fromY + 1.5, 12.0);
+  public getTerrainHeight(x: number, z: number, fromY: number = 0.0): number {
+    const startY = fromY + 0.45;
     this.raycaster.set(new THREE.Vector3(x, startY, z), this.downVector);
-    this.raycaster.far = 35.0;
+    this.raycaster.far = 40.0;
 
     const hits = this.raycaster.intersectObjects(this.terrainColliders, false);
-    if (hits.length > 0) {
-      return hits[0].point.y;
+    for (const hit of hits) {
+      if (hit.point.y <= fromY + 0.42) {
+        return hit.point.y;
+      }
     }
 
     return 0.0;
+  }
+
+  /**
+   * Prevents flying or jumping up through solid platforms from underneath.
+   */
+  public resolveCeilingCollision(pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight: number = 1.8): void {
+    const headY = pos.y + characterHeight;
+    for (const sp of this.skyPlatforms) {
+      if (pos.x >= sp.minX - 0.25 && pos.x <= sp.maxX + 0.25 && pos.z >= sp.minZ - 0.25 && pos.z <= sp.maxZ + 0.25) {
+        if (headY >= sp.bottomY && pos.y < sp.bottomY) {
+          pos.y = sp.bottomY - characterHeight;
+          if (velocity.y > 0) {
+            velocity.y = 0;
+          }
+        }
+      }
+    }
   }
 
   /**

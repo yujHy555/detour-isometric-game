@@ -95,16 +95,27 @@ export class InputManager {
   private onKeyDown(e: KeyboardEvent) {
     this.lastInputType = 'keyboard';
     this.keys[e.code] = true;
-    if (e.code === 'Space') {
+    if (e.key) {
+      this.keys[e.key] = true;
+      this.keys[e.key.toLowerCase()] = true;
+    }
+
+    // Support Space, as well as KeyJ / KeyK (to bypass keyboard ghosting on membrane keyboards when pressing multiple WASD keys simultaneously)
+    if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32 || e.code === 'KeyJ' || e.code === 'KeyK') {
+      e.preventDefault();
       this.jumpJustPressed = true;
     }
-    if (e.code === 'KeyE' || e.code === 'KeyF') {
+    if (e.code === 'KeyE' || e.code === 'KeyF' || e.key === 'e' || e.key === 'f') {
       this.actionJustPressed = true;
     }
   }
 
   private onKeyUp(e: KeyboardEvent) {
     this.keys[e.code] = false;
+    if (e.key) {
+      this.keys[e.key] = false;
+      this.keys[e.key.toLowerCase()] = false;
+    }
   }
 
   private onMouseMove(e: MouseEvent) {
@@ -238,10 +249,10 @@ export class InputManager {
     let sprintPressed = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.touchSprintActive);
 
     // 1. Keyboard Inputs
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) screenX -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) screenX += 1;
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) screenZ -= 1;
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) screenZ += 1;
+    if (this.keys['KeyA'] || this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) screenX -= 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) screenX += 1;
+    if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.keys['w'] || this.keys['W']) screenZ -= 1;
+    if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.keys['s'] || this.keys['S']) screenZ += 1;
 
     // 2. Touch Joystick Input
     if (this.touchActive) {

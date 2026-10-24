@@ -3,6 +3,7 @@ import { IsometricCamera } from './camera/IsometricCamera.ts';
 import { InputManager } from './engine/InputManager.ts';
 import { CharacterController } from './controllers/CharacterController.ts';
 import { IsometricWorld } from './environment/IsometricWorld.ts';
+import { CollectibleManager } from './environment/CollectibleManager.ts';
 
 class DetourGame {
   private canvas: HTMLCanvasElement;
@@ -12,6 +13,7 @@ class DetourGame {
   private inputManager: InputManager;
   private character: CharacterController;
   private world: IsometricWorld;
+  private collectibles: CollectibleManager;
   private clock: THREE.Clock;
 
   // Gamepad HUD Elements
@@ -55,6 +57,7 @@ class DetourGame {
     this.inputManager = new InputManager();
     this.world = new IsometricWorld(this.scene);
     this.character = new CharacterController(this.scene);
+    this.collectibles = new CollectibleManager(this.scene);
 
     // Initial character spawn on Central Plaza
     this.character.position.set(0, 1.0, 0);
@@ -169,10 +172,14 @@ class DetourGame {
       this.inputManager.mouseWorldTarget,
       this.inputManager.isAiming,
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
-      (pos, radius) => this.world.resolveHorizontalCollision(pos, radius)
+      (pos, radius) => this.world.resolveHorizontalCollision(pos, radius),
+      (pos, vel, h) => this.world.resolveCeilingCollision(pos, vel, h)
     );
 
-    // 4. Update Isometric Camera Tracking
+    // 4. Update Cyber Energy Core Collectibles
+    this.collectibles.update(this.character.position, dt);
+
+    // 5. Update Isometric Camera Tracking
     this.cameraSystem.update(this.character.position, dt);
 
     // 5. Render Scene
