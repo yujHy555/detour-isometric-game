@@ -96,6 +96,8 @@ class DetourGame {
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
 
+    this.collectibles.onUpgradeCollected = (type: string) => this.handleUpgradeCollected(type);
+
     this.plants = new PlantManager(
       this.scene,
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
@@ -337,14 +339,40 @@ class DetourGame {
   }
 
   /**
+   * Handles unlocking upgrades such as the Jetpack Overdrive Booster
+   */
+  private handleUpgradeCollected(type: string) {
+    if (type === 'jetpack') {
+      this.character.upgradeJetpack();
+
+      // Highlight UI Quick-Slot to active gold
+      const slotBox = document.getElementById('slot-jetpack-box');
+      if (slotBox) slotBox.classList.add('active-upgrade');
+      const statusEl = document.getElementById('slot-jetpack-status');
+      if (statusEl) statusEl.textContent = 'ACTIVE';
+
+      // Slide in upgrade notification banner
+      const banner = document.getElementById('upgrade-banner');
+      if (banner) {
+        banner.classList.add('show');
+        setTimeout(() => {
+          banner.classList.remove('show');
+        }, 4500);
+      }
+    }
+  }
+
+  /**
    * Updates all dynamic widgets of the Sci-Fi UI HUD (Reference Image 2)
    */
   private updateHUD(dt: number) {
-    // 1. Jetpack Thrust Fuel Gauge Simulation & Display
+    // 1. Jetpack Thrust Fuel Gauge Simulation & Display (with efficiency bonus in overdrive)
     if (this.character.isFlying) {
-      this.thrustFuel = Math.max(0, this.thrustFuel - dt * 140);
+      const burnRate = this.character.jetpackUpgraded ? 85 : 140; // 40% fuel efficiency bonus
+      this.thrustFuel = Math.max(0, this.thrustFuel - dt * burnRate);
     } else {
-      this.thrustFuel = Math.min(this.maxFuel, this.thrustFuel + dt * 220);
+      const rechargeRate = this.character.jetpackUpgraded ? 280 : 220;
+      this.thrustFuel = Math.min(this.maxFuel, this.thrustFuel + dt * rechargeRate);
     }
 
     if (this.cockpitFuelFill) {
@@ -380,9 +408,10 @@ class DetourGame {
       const radarRadius = 55; // pixels from center
       const maxRadarWorldDist = 28; // world coordinate radius
 
-      for (let i = 0; i < this.radarBlipElements.length; i++) {
+      for (let i = 0; i < items.length; i++) {
+        if (i >= this.radarBlipElements.length) break;
         const blipEl = this.radarBlipElements[i];
-        if (i >= items.length || items[i].isCollected) {
+        if (items[i].isCollected) {
           if (blipEl.style.display !== 'none') blipEl.style.display = 'none';
           continue;
         }
@@ -399,10 +428,38 @@ class DetourGame {
           const blipY = 72 + Math.sin(angle) * (scale * radarRadius);
 
           if (blipEl.style.display !== 'block') blipEl.style.display = 'block';
+          blipEl.className = 'radar-blip';
           blipEl.style.left = `${blipX.toFixed(1)}px`;
           blipEl.style.top = `${blipY.toFixed(1)}px`;
         } else {
           if (blipEl.style.display !== 'none') blipEl.style.display = 'none';
+        }
+      }
+
+      // Radar Blip for Jetpack Upgrade Module
+      const upgradeBlipIdx = items.length;
+      if (upgradeBlipIdx < this.radarBlipElements.length) {
+        const upBlipEl = this.radarBlipElements[upgradeBlipIdx];
+        const upItem = this.collectibles.jetpackUpgradeItem;
+        if (upItem && !upItem.isCollected) {
+          const dx = upItem.pos.x - this.character.position.x;
+          const dz = upItem.pos.z - this.character.position.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < maxRadarWorldDist) {
+            const scale = dist / maxRadarWorldDist;
+            const angle = Math.atan2(dz, dx) + Math.PI / 4;
+            const blipX = 72 + Math.cos(angle) * (scale * radarRadius);
+            const blipY = 72 + Math.sin(angle) * (scale * radarRadius);
+
+            if (upBlipEl.style.display !== 'block') upBlipEl.style.display = 'block';
+            upBlipEl.className = 'radar-blip radar-blip-jetpack';
+            upBlipEl.style.left = `${blipX.toFixed(1)}px`;
+            upBlipEl.style.top = `${blipY.toFixed(1)}px`;
+          } else {
+            if (upBlipEl.style.display !== 'none') upBlipEl.style.display = 'none';
+          }
+        } else {
+          if (upBlipEl.style.display !== 'none') upBlipEl.style.display = 'none';
         }
       }
     }

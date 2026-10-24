@@ -7,12 +7,17 @@ export interface CollectibleItem {
   pos: THREE.Vector3;
   groundY: number;
   isCollected: boolean;
+  type?: 'core' | 'jetpack_upgrade';
+  baseY?: number;
+  bobTimer?: number;
 }
 
 export class CollectibleManager {
   private scene: THREE.Scene;
   private audio: AudioManager;
   public items: CollectibleItem[] = [];
+  public jetpackUpgradeItem?: CollectibleItem;
+  public onUpgradeCollected?: (type: string) => void;
   public collectedCount: number = 0;
   public totalCount: number = 0;
   private uiCounter: HTMLElement | null = null;
@@ -28,6 +33,7 @@ export class CollectibleManager {
   private sharedShadowMat: THREE.MeshBasicMaterial;
   private sharedProjRingGeo: THREE.RingGeometry;
   private sharedProjRingMat: THREE.MeshBasicMaterial;
+  private amberProjRingMat: THREE.MeshBasicMaterial;
 
   // Pre-allocated collection shockwave VFX (zero runtime allocations)
   private vfxRing: THREE.Mesh;
@@ -103,6 +109,19 @@ export class CollectibleManager {
       polygonOffsetUnits: -4.0
     });
 
+    // Golden Amber footprint projection ring for the Jetpack Upgrade icon
+    this.amberProjRingMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -4.0
+    });
+
     // Pre-allocated VFX shockwave ring
     const vfxGeo = new THREE.RingGeometry(0.15, 0.35, 20);
     vfxGeo.rotateX(-Math.PI / 2);
@@ -119,6 +138,7 @@ export class CollectibleManager {
     this.scene.add(this.vfxRing);
 
     this.spawnAllCores(getTerrainHeight, getTerrainNormal);
+    this.spawnJetpackUpgrade(getTerrainHeight, getTerrainNormal);
     this.updateHUD();
   }
 
@@ -200,6 +220,175 @@ export class CollectibleManager {
   }
 
   /**
+   * Builds an iconic, high-tech 3D Jetpack Thruster Overdrive module
+   * with swept aerodynamic speed wings, glowing plasma core, twin nozzles, and orbiting gyro ring
+   */
+  private createJetpackUpgradeMesh(): THREE.Group {
+    const group = new THREE.Group();
+
+    // 1. Central Turbine Cowl (Charcoal slate metal)
+    const cowlGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.44, 16);
+    const cowlMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.25
+    });
+    const cowl = new THREE.Mesh(cowlGeo, cowlMat);
+    group.add(cowl);
+
+    // Glowing amber-gold plasma core inside cowl
+    const coreGeo = new THREE.SphereGeometry(0.20, 16, 16);
+    const coreMat = new THREE.MeshStandardMaterial({
+      color: 0xfbbf24,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 1.4,
+      roughness: 0.2
+    });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    group.add(core);
+
+    // 2. Twin Aerodynamic Swept Wings (Speed Icon aesthetic)
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, 0);
+    wingShape.lineTo(0.52, 0.22);
+    wingShape.lineTo(0.46, -0.14);
+    wingShape.lineTo(0, -0.07);
+    wingShape.closePath();
+
+    const wingGeo = new THREE.ExtrudeGeometry(wingShape, {
+      depth: 0.04,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 1,
+      bevelSize: 0.015,
+      bevelThickness: 0.015
+    });
+    wingGeo.center();
+
+    const wingMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      metalness: 0.75,
+      roughness: 0.3
+    });
+
+    const leftWing = new THREE.Mesh(wingGeo, wingMat);
+    leftWing.position.set(-0.30, 0.02, 0);
+    leftWing.rotation.set(0, 0, 0.15);
+    group.add(leftWing);
+
+    const rightWing = new THREE.Mesh(wingGeo, wingMat);
+    rightWing.position.set(0.30, 0.02, 0);
+    rightWing.rotation.set(0, Math.PI, -0.15);
+    group.add(rightWing);
+
+    // Glowing wing edge strips
+    const edgeGeo = new THREE.BoxGeometry(0.50, 0.03, 0.045);
+    const edgeMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24
+    });
+    const leftEdge = new THREE.Mesh(edgeGeo, edgeMat);
+    leftEdge.position.set(-0.32, 0.13, 0);
+    leftEdge.rotation.z = 0.40;
+    group.add(leftEdge);
+
+    const rightEdge = new THREE.Mesh(edgeGeo, edgeMat);
+    rightEdge.position.set(0.32, 0.13, 0);
+    rightEdge.rotation.z = -0.40;
+    group.add(rightEdge);
+
+    // 3. Twin Jet Thruster Micro-Nozzles
+    const nozzleGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.16, 12);
+    const nozzleMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      metalness: 0.9,
+      roughness: 0.2
+    });
+    const leftNozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
+    leftNozzle.position.set(-0.15, -0.26, 0);
+    group.add(leftNozzle);
+
+    const rightNozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
+    rightNozzle.position.set(0.15, -0.26, 0);
+    group.add(rightNozzle);
+
+    // Micro Thruster Flame Cones (glowing amber flame jets pointing down)
+    const flameGeo = new THREE.ConeGeometry(0.075, 0.20, 10);
+    flameGeo.rotateX(Math.PI);
+    const flameMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+    const leftFlame = new THREE.Mesh(flameGeo, flameMat);
+    leftFlame.position.set(-0.15, -0.40, 0);
+    group.add(leftFlame);
+
+    const rightFlame = new THREE.Mesh(flameGeo, flameMat);
+    rightFlame.position.set(0.15, -0.40, 0);
+    group.add(rightFlame);
+
+    // 4. Floating Chevron Gyro Ring
+    const gyroGeo = new THREE.TorusGeometry(0.62, 0.026, 6, 24);
+    const gyroMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending
+    });
+    const gyro = new THREE.Mesh(gyroGeo, gyroMat);
+    gyro.name = 'gyroRing';
+    gyro.rotation.x = Math.PI / 3;
+    group.add(gyro);
+
+    return group;
+  }
+
+  private spawnJetpackUpgrade(
+    getTerrainHeight?: (x: number, z: number, fromY?: number) => number,
+    getTerrainNormal?: (x: number, z: number, fromY?: number) => THREE.Vector3
+  ) {
+    // Strategic placement: Platform 2 at (14, 2.3, 8.0)
+    // Elevation: platform surface is 1.5m, hovering at y = 2.4m
+    const pos = new THREE.Vector3(14, 2.4, 8.0);
+    const mesh = this.createJetpackUpgradeMesh();
+    mesh.position.copy(pos);
+    this.scene.add(mesh);
+
+    const groundY = getTerrainHeight ? getTerrainHeight(pos.x, pos.z, pos.y) : 1.5;
+    const groundNormal = getTerrainNormal ? getTerrainNormal(pos.x, pos.z, pos.y) : new THREE.Vector3(0, 1, 0);
+
+    const shadowGroup = new THREE.Group();
+    const shadowPos = new THREE.Vector3(pos.x, groundY, pos.z).addScaledVector(groundNormal, 0.035);
+    shadowGroup.position.copy(shadowPos);
+    shadowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), groundNormal);
+
+    const shadow = new THREE.Mesh(this.sharedShadowGeo, this.sharedShadowMat);
+    shadow.renderOrder = 3;
+    shadowGroup.add(shadow);
+
+    // Distinct golden amber footprint ring
+    const targetRing = new THREE.Mesh(this.sharedProjRingGeo, this.amberProjRingMat);
+    targetRing.position.y = 0.005;
+    targetRing.renderOrder = 4;
+    shadowGroup.add(targetRing);
+
+    shadowGroup.scale.set(1.15, 1.15, 1.15);
+    this.scene.add(shadowGroup);
+
+    this.jetpackUpgradeItem = {
+      mesh,
+      shadowMesh: shadowGroup,
+      pos: pos.clone(),
+      groundY,
+      isCollected: false,
+      type: 'jetpack_upgrade',
+      baseY: pos.y,
+      bobTimer: 0
+    };
+  }
+
+  /**
    * Ultra-lightweight per-frame update:
    * Stationary spin in place, zero physics, zero allocations, instantaneous collection
    */
@@ -238,6 +427,30 @@ export class CollectibleManager {
         this.collectItem(item);
       }
     }
+
+    // 3. Process Jetpack Upgrade Collectible
+    if (this.jetpackUpgradeItem && !this.jetpackUpgradeItem.isCollected) {
+      const up = this.jetpackUpgradeItem;
+      up.bobTimer = (up.bobTimer || 0) + dt * 2.8;
+      up.mesh.position.y = (up.baseY || up.pos.y) + Math.sin(up.bobTimer) * 0.12;
+      up.mesh.rotation.y += dt * 2.2;
+
+      // Animate gyro ring counter-rotation
+      const gyro = up.mesh.getObjectByName('gyroRing');
+      if (gyro) {
+        gyro.rotation.z += dt * 3.0;
+      }
+
+      // Fast squared-distance collision check
+      const dx = charX - up.pos.x;
+      const dz = charZ - up.pos.z;
+      const dy = Math.abs(charY - up.mesh.position.y);
+
+      // Pickup radius: 1.25m horizontal, 1.5m vertical
+      if (dx * dx + dz * dz < 1.6 && dy < 1.5) {
+        this.collectJetpackUpgrade(up);
+      }
+    }
   }
 
   private collectItem(item: CollectibleItem) {
@@ -254,14 +467,40 @@ export class CollectibleManager {
       // Audio fallback
     }
 
-    // Trigger pre-allocated shockwave flash
+    // Trigger pre-allocated shockwave flash (cyan)
     this.vfxRing.position.copy(item.pos);
     this.vfxRing.scale.set(1, 1, 1);
+    (this.vfxRing.material as THREE.MeshBasicMaterial).color.setHex(0x00f0ff);
     (this.vfxRing.material as THREE.MeshBasicMaterial).opacity = 0.9;
     this.vfxRing.visible = true;
     this.vfxTimer = this.vfxMaxTime;
 
     this.updateHUD();
+  }
+
+  private collectJetpackUpgrade(item: CollectibleItem) {
+    item.isCollected = true;
+    item.mesh.visible = false;
+    item.shadowMesh.visible = false;
+
+    // Triumphant power-up fanfare
+    try {
+      this.audio.playUpgradeUnlocked();
+    } catch {
+      // Audio fallback
+    }
+
+    // Trigger radiant golden shockwave flash
+    this.vfxRing.position.copy(item.mesh.position);
+    this.vfxRing.scale.set(1.2, 1.2, 1.2);
+    (this.vfxRing.material as THREE.MeshBasicMaterial).color.setHex(0xfbbf24);
+    (this.vfxRing.material as THREE.MeshBasicMaterial).opacity = 1.0;
+    this.vfxRing.visible = true;
+    this.vfxTimer = this.vfxMaxTime * 1.5;
+
+    if (this.onUpgradeCollected) {
+      this.onUpgradeCollected('jetpack');
+    }
   }
 
   public getItems() {

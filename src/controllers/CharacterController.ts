@@ -30,6 +30,7 @@ export class CharacterController {
 
   // Jetpack Flight System & Dual AAA Flames
   public isFlying: boolean = false;
+  public jetpackUpgraded: boolean = false;
   private flyTimer: number = 0;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
   private spineBone?: THREE.Bone;
@@ -450,12 +451,21 @@ export class CharacterController {
     this.jetpackFlamesGroup.add(this.flameRight);
   }
 
+  public upgradeJetpack() {
+    this.jetpackUpgraded = true;
+    if (this.jetpackFlamesGroup) {
+      this.jetpackFlamesGroup.scale.set(1.4, 1.4, 1.4);
+    }
+  }
+
   private spawnSoftExhaustPuff(flameNode: THREE.Group) {
-    const geo = new THREE.SphereGeometry(0.045, 8, 8);
+    const geo = new THREE.SphereGeometry(this.jetpackUpgraded ? 0.065 : 0.045, 8, 8);
+    // Overdrive dual-color plasma: alternating fiery amber & high-thrust cyan
+    const particleColor = this.jetpackUpgraded && Math.random() < 0.5 ? 0xfbbf24 : 0x38bdf8;
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
+      color: particleColor,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.85,
       depthWrite: false,
       blending: THREE.AdditiveBlending
     });
@@ -468,14 +478,15 @@ export class CharacterController {
     this.sceneRef.add(p);
 
     // Puff drifts backward along flame alignment
-    const driftDir = new THREE.Vector3(0, -1, 0).applyQuaternion(this.jetpackFlamesGroup.quaternion).multiplyScalar(1.6);
+    const driftSpeed = this.jetpackUpgraded ? 2.4 : 1.6;
+    const driftDir = new THREE.Vector3(0, -1, 0).applyQuaternion(this.jetpackFlamesGroup.quaternion).multiplyScalar(driftSpeed);
     this.thrusterParticles.push({
       mesh: p,
-      vx: driftDir.x + (Math.random() - 0.5) * 0.3,
-      vy: driftDir.y + (Math.random() - 0.5) * 0.3,
-      vz: driftDir.z + (Math.random() - 0.5) * 0.3,
+      vx: driftDir.x + (Math.random() - 0.5) * 0.4,
+      vy: driftDir.y + (Math.random() - 0.5) * 0.4,
+      vz: driftDir.z + (Math.random() - 0.5) * 0.4,
       timer: 0,
-      maxTime: 0.20 + Math.random() * 0.08
+      maxTime: (this.jetpackUpgraded ? 0.28 : 0.20) + Math.random() * 0.08
     });
   }
 
@@ -555,7 +566,8 @@ export class CharacterController {
         let diff = targetRot - this.group.rotation.y;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        this.group.rotation.y += diff * Math.min(1.0, dt * 18.0);
+        const rotTurnSpeed = (this.isFlying && this.jetpackUpgraded) ? 32.0 : 18.0;
+        this.group.rotation.y += diff * Math.min(1.0, dt * rotTurnSpeed);
       }
     } else {
       // Immediate crisp braking friction - stops on a dime with zero ice sliding
@@ -637,19 +649,23 @@ export class CharacterController {
       this.flyTimer += dt;
       this.isGrounded = false;
 
+      // Dynamic flight parameters tuned for base vs upgraded overdrive
+      const flyHozSpeed = this.runSpeed * (this.jetpackUpgraded ? 2.65 : 1.6);
+      const flyAgility = this.jetpackUpgraded ? 28.0 : 14.0;
+      const flyAscentSpeed = this.jetpackUpgraded ? 3.8 : 2.5;
+
       // Initial lift-off: if starting from stationary ground, float up gently in idle pose
       if (this.flyTimer < 0.38 && !isMoving && !this.wasInAir) {
-        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 1.8, dt * 5.0);
+        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, this.jetpackUpgraded ? 2.8 : 1.8, dt * 6.0);
       } else {
         // Controlled, comfortable hover & ascent (more horizontal than vertical)
-        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 2.5, dt * 6.0);
+        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, flyAscentSpeed, dt * (this.jetpackUpgraded ? 8.0 : 6.0));
       }
 
       // Fast, responsive horizontal aerial locomotion (moves more horizontally than vertically)
       if (inputMoving) {
-        const flyHozSpeed = this.runSpeed * 1.6;
-        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveVector.x * flyHozSpeed, dt * 14.0);
-        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveVector.z * flyHozSpeed, dt * 14.0);
+        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveVector.x * flyHozSpeed, dt * flyAgility);
+        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveVector.z * flyHozSpeed, dt * flyAgility);
       }
     } else {
       if (this.isFlying) {
@@ -683,13 +699,16 @@ export class CharacterController {
         this.jetpackFlamesGroup.rotation.set(0, rotY, 0);
       }
 
-      // High-Frequency Soft-Edge Flame Pulse & Flicker
+      // High-Frequency Soft-Edge Flame Pulse & Flicker (amplified in overdrive)
       const flicker = 1.0 + Math.sin(this.flyTimer * 48.0) * 0.16 + (Math.random() - 0.5) * 0.10;
-      this.flameLeft.scale.set(1.0, flicker, 1.0);
-      this.flameRight.scale.set(1.0, flicker, 1.0);
+      const flameScaleX = this.jetpackUpgraded ? 1.35 : 1.0;
+      const flameScaleY = flicker * (this.jetpackUpgraded ? 1.45 : 1.0);
+      this.flameLeft.scale.set(flameScaleX, flameScaleY, flameScaleX);
+      this.flameRight.scale.set(flameScaleX, flameScaleY, flameScaleX);
 
       // Trailing soft exhaust puffs
-      if (Math.random() < 0.6) {
+      const puffChance = this.jetpackUpgraded ? 0.85 : 0.6;
+      if (Math.random() < puffChance) {
         this.spawnSoftExhaustPuff(this.flameLeft);
         this.spawnSoftExhaustPuff(this.flameRight);
       }

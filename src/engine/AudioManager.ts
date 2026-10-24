@@ -416,4 +416,79 @@ export class AudioManager {
       osc.stop(t + idx * 0.06 + 0.65);
     });
   }
+
+  /**
+   * Triumphant, high-energy jetpack overdrive upgrade sound effect
+   */
+  public playUpgradeUnlocked() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // 1. Rising sub-bass power swell
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sawtooth';
+    subOsc.frequency.setValueAtTime(60, t);
+    subOsc.frequency.exponentialRampToValueAtTime(160, t + 0.35);
+
+    const subFilter = this.ctx.createBiquadFilter();
+    subFilter.type = 'lowpass';
+    subFilter.frequency.setValueAtTime(180, t);
+    subFilter.frequency.exponentialRampToValueAtTime(450, t + 0.35);
+
+    subGain.gain.setValueAtTime(0.01, t);
+    subGain.gain.linearRampToValueAtTime(0.35, t + 0.15);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+
+    subOsc.connect(subFilter);
+    subFilter.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 0.65);
+
+    // 2. Ascending heroic sci-fi fanfare chords
+    const chordNotes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+    chordNotes.forEach((freq, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'sine';
+      const noteStart = t + idx * 0.065;
+      osc.frequency.setValueAtTime(freq, noteStart);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.05, noteStart + 0.4);
+
+      gain.gain.setValueAtTime(0.001, noteStart);
+      gain.gain.linearRampToValueAtTime(0.28, noteStart + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.55);
+
+      osc.connect(gain);
+      gain.connect(this.ctx!.destination);
+      osc.start(noteStart);
+      osc.stop(noteStart + 0.6);
+    });
+
+    // 3. Shimmering plasma surge noise burst
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400, t);
+      filter.frequency.exponentialRampToValueAtTime(4200, t + 0.4);
+      filter.Q.setValueAtTime(3.0, t);
+
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.001, t);
+      nGain.gain.linearRampToValueAtTime(0.22, t + 0.1);
+      nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.ctx.destination);
+      noise.start(t);
+      noise.stop(t + 0.55);
+    }
+  }
 }
