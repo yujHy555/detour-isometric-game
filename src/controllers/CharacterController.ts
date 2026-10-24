@@ -18,10 +18,10 @@ export class CharacterController {
   public state: CharacterState = CharacterState.IDLE;
   public isGrounded: boolean = true;
 
-  // Visual Meshes
+  // Visual Meshes & Loading
   private modelMesh?: THREE.Group;
-  private proceduralRig?: THREE.Group;
   private shadowMesh!: THREE.Mesh;
+  public isLoaded: boolean = false;
 
   // Custom GLB Animation Mixer
   private mixer?: THREE.AnimationMixer;
@@ -39,9 +39,8 @@ export class CharacterController {
   private tempPos: THREE.Vector3 = new THREE.Vector3();
   private tempQuat: THREE.Quaternion = new THREE.Quaternion();
 
-  // Simple Lightweight Cyber Preload Device (Ultra-smooth zero stutter)
-  private preloadDroneRing?: THREE.Mesh;
   private animTimer: number = 0;
+  private tripleJumpSpinTimer: number = 0;
 
   // Physics constants - tuned to realistic stride & zero foot-sliding
   private readonly walkSpeed = 2.1;
@@ -49,10 +48,10 @@ export class CharacterController {
   private readonly jumpForce = 8.8;
   private readonly gravity = -20.0;
 
-  // Collision & Jump Stats
+  // Collision & Jump Stats (Single, Double, and Triple Jump)
   public readonly bodyRadius: number = 0.35;
   private jumpCount: number = 0;
-  private readonly maxJumps: number = 2;
+  private readonly maxJumps: number = 3;
   private coyoteTimer: number = 0;
   private sceneRef: THREE.Scene;
   private jumpRings: { mesh: THREE.Mesh; timer: number; maxTime: number }[] = [];
@@ -67,10 +66,10 @@ export class CharacterController {
     this.sceneRef = scene;
     this.audio = audio || new AudioManager();
     this.group = new THREE.Group();
+    this.group.visible = false;
     scene.add(this.group);
 
     this.createContactShadow(scene);
-    this.createProceduralRig();
     this.createJetpackFlames(scene);
     this.attemptLoadCustomModel();
   }
@@ -94,51 +93,16 @@ export class CharacterController {
     const shadowMat = new THREE.MeshBasicMaterial({
       map: shadowTex,
       transparent: true,
-      depthWrite: false
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -4.0
     });
 
     this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    this.shadowMesh.renderOrder = 3;
+    this.shadowMesh.visible = false;
     scene.add(this.shadowMesh);
-  }
-
-  /**
-   * Ultra-Lightweight Cyber Preloading Device
-   * Minimalist geometric cyber probe with zero GPU allocation overhead
-   */
-  private createProceduralRig() {
-    this.proceduralRig = new THREE.Group();
-
-    const droneMat = new THREE.MeshStandardMaterial({
-      color: 0x00f0ff,
-      roughness: 0.25,
-      metalness: 0.8,
-      emissive: 0x006688,
-      emissiveIntensity: 0.5
-    });
-
-    // Central sleek digital core
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), droneMat);
-    core.position.y = 1.0;
-    this.proceduralRig.add(core);
-
-    // Front sensor visor strip
-    const visor = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.08, 0.12),
-      new THREE.MeshBasicMaterial({ color: 0xbae6fd })
-    );
-    visor.position.set(0, 1.02, 0.24);
-    this.proceduralRig.add(visor);
-
-    // Single sleek orbiting cyber gyro-ring
-    this.preloadDroneRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.46, 0.022, 6, 20),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-    );
-    this.preloadDroneRing.position.y = 1.0;
-    this.preloadDroneRing.rotation.x = Math.PI / 3;
-    this.proceduralRig.add(this.preloadDroneRing);
-
-    this.group.add(this.proceduralRig);
   }
 
   /**
@@ -161,9 +125,6 @@ export class CharacterController {
         path,
         (gltf) => {
           console.log(`[CharacterController] Successfully loaded custom model from ${path}`);
-          if (this.proceduralRig) {
-            this.proceduralRig.visible = false;
-          }
 
           this.modelMesh = gltf.scene;
 
@@ -238,6 +199,15 @@ export class CharacterController {
             }
           });
           this.group.add(this.modelMesh);
+
+          // Smooth drop-in entrance when fully loaded: drops gently from sky onto Central Plaza
+          this.isLoaded = true;
+          this.group.visible = true;
+          this.shadowMesh.visible = true;
+          this.position.y += 3.5;
+          this.velocity.set(0, -2.5, 0);
+          this.isGrounded = false;
+          this.wasInAir = true;
 
           // Setup Animations
           if (gltf.animations && gltf.animations.length > 0) {
@@ -331,11 +301,11 @@ export class CharacterController {
     this.currentAction = targetAction;
   }
 
-  private spawnDoubleJumpEffect() {
+  private spawnDoubleJumpEffect(color: number = 0x00f0ff) {
     const geo = new THREE.RingGeometry(0.15, 0.45, 24);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: color,
       transparent: true,
       opacity: 0.85,
       side: THREE.DoubleSide,
@@ -540,12 +510,26 @@ export class CharacterController {
     isAiming: boolean,
     getTerrainHeight: (x: number, z: number, fromY?: number) => number,
     resolveCollision?: (pos: THREE.Vector3, radius: number) => THREE.Vector3,
-    resolveCeiling?: (pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight?: number) => void
+    resolveCeiling?: (pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight?: number) => void,
+    getTerrainNormal?: (x: number, z: number, fromY?: number) => THREE.Vector3
   ) {
+    if (!this.isLoaded) return;
+
     this.animTimer += dt;
     this.updateJumpRings(dt);
     this.updateDustPuffs(dt);
     this.updateThrusterParticles(dt);
+
+    // Triple Jump somersault flip animation
+    if (this.tripleJumpSpinTimer > 0) {
+      this.tripleJumpSpinTimer = Math.max(0, this.tripleJumpSpinTimer - dt);
+      if (this.modelMesh) {
+        const progress = 1.0 - (this.tripleJumpSpinTimer / 0.45);
+        this.modelMesh.rotation.x = progress * Math.PI * 2;
+      }
+    } else if (this.modelMesh && this.modelMesh.rotation.x !== 0) {
+      this.modelMesh.rotation.x = 0;
+    }
 
     const inputMoving = moveVector.lengthSq() > 0.001;
     const currentSpeed = isRunning ? this.runSpeed : this.walkSpeed;
@@ -598,29 +582,42 @@ export class CharacterController {
       this.coyoteTimer = Math.max(0, this.coyoteTimer - dt);
     }
 
-    // 2. Jump & Jetpack Flight Handling
+    // 2. Jump & Jetpack Flight Handling (Single, Double, and Triple Jump)
     if (jumpPressed) {
       if (this.isGrounded || this.coyoteTimer > 0) {
-        // First jump from ground (or ledge coyote grace)
+        // Jump 1: Ground Jump
         this.velocity.y = this.jumpForce;
         this.isGrounded = false;
         this.coyoteTimer = 0;
         this.jumpCount = 1;
-        this.audio.playJump(false);
+        this.audio.playJump(1);
         this.playAnimation(CharacterState.JUMP, 0.08);
         if (this.currentAction) {
           this.currentAction.reset().play();
         }
       } else if (this.jumpCount < this.maxJumps) {
-        // Double Jump in mid-air!
-        this.velocity.y = this.jumpForce * 0.95;
-        this.jumpCount = 2;
-        this.audio.playJump(true);
-        this.playAnimation(CharacterState.JUMP, 0.06);
-        if (this.currentAction) {
-          this.currentAction.reset().play();
+        if (this.jumpCount === 1) {
+          // Jump 2: Double Jump in mid-air
+          this.velocity.y = this.jumpForce * 0.95;
+          this.jumpCount = 2;
+          this.audio.playJump(2);
+          this.playAnimation(CharacterState.JUMP, 0.06);
+          if (this.currentAction) {
+            this.currentAction.reset().play();
+          }
+          this.spawnDoubleJumpEffect(0x00f0ff);
+        } else if (this.jumpCount === 2) {
+          // Jump 3: Triple Jump! Super high energetic somersault leap
+          this.velocity.y = this.jumpForce * 1.15;
+          this.jumpCount = 3;
+          this.audio.playJump(3);
+          this.playAnimation(CharacterState.JUMP, 0.04);
+          if (this.currentAction) {
+            this.currentAction.reset().play();
+          }
+          this.spawnDoubleJumpEffect(0xfde047); // Radiant Golden Sonic Ring!
+          this.tripleJumpSpinTimer = 0.45;
         }
-        this.spawnDoubleJumpEffect();
       }
     }
 
@@ -774,13 +771,18 @@ export class CharacterController {
 
     this.group.position.copy(this.position);
 
-    // 4. Update Contact Shadow
+    // 4. Update Contact Shadow - Smoothly oriented to surface slope normal (never intersects slopes)
     if (this.shadowMesh) {
       const heightAboveGround = Math.max(0, this.position.y - groundY);
-      this.shadowMesh.position.set(this.position.x, groundY + 0.02, this.position.z);
+      const groundNormal = getTerrainNormal ? getTerrainNormal(this.position.x, this.position.z, groundY) : new THREE.Vector3(0, 1, 0);
+
+      // Offset along normal slightly so it never intersects or cuts into ramps
+      this.shadowMesh.position.copy(new THREE.Vector3(this.position.x, groundY, this.position.z).addScaledVector(groundNormal, 0.03));
+      this.shadowMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), groundNormal);
+
       const scale = THREE.MathUtils.clamp(1.0 - heightAboveGround * 0.15, 0.4, 1.0);
       this.shadowMesh.scale.set(scale, scale, scale);
-      (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.6 - heightAboveGround * 0.1, 0.1, 0.6);
+      (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.65 - heightAboveGround * 0.1, 0.1, 0.65);
     }
 
     // 5. Animation State Machine (Idle -> Walk/Run, Jump -> Fall, Jetpack -> Idle float -> Fly)
@@ -798,7 +800,7 @@ export class CharacterController {
       this.state = CharacterState.IDLE;
     }
 
-    // Update GLB Mixer or Procedural Limb Animations
+    // Update GLB Mixer Animations
     if (this.mixer) {
       this.mixer.update(dt);
       const fadeDuration = this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15);
@@ -818,19 +820,6 @@ export class CharacterController {
           this.currentAction.timeScale = 1.0;
         }
       }
-    } else if (this.proceduralRig && this.proceduralRig.visible) {
-      this.updateProceduralLimbs(dt, isMoving, isRunning);
     }
-  }
-
-  private updateProceduralLimbs(dt: number, _isMoving: boolean, _isRunning: boolean) {
-    if (!this.proceduralRig || !this.proceduralRig.visible) return;
-
-    // Smooth gentle gyro orbit rotation & hover bob
-    if (this.preloadDroneRing) {
-      this.preloadDroneRing.rotation.z += dt * 2.5;
-      this.preloadDroneRing.rotation.x += dt * 1.5;
-    }
-    this.proceduralRig.position.y = Math.sin(this.animTimer * 3.5) * 0.05;
   }
 }

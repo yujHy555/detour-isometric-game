@@ -200,7 +200,8 @@ class DetourGame {
       this.inputManager.isAiming,
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
       (pos, radius) => this.world.resolveHorizontalCollision(pos, radius),
-      (pos, vel, h) => this.world.resolveCeilingCollision(pos, vel, h)
+      (pos, vel, h) => this.world.resolveCeilingCollision(pos, vel, h),
+      (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
 
     // 4. Update Cyber Energy Core Collectibles

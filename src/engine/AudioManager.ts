@@ -101,15 +101,16 @@ export class AudioManager {
   }
 
   /**
-   * Jump takeoff and cybernetic double-jump impulse
+   * Jump takeoff and cybernetic double/triple jump impulses
    */
-  public playJump(isDoubleJump: boolean = false) {
+  public playJump(tierOrDouble: number | boolean = 1) {
     this.resume();
     if (!this.ctx || this.isMuted) return;
 
     const t = this.ctx.currentTime;
+    const tier = typeof tierOrDouble === 'boolean' ? (tierOrDouble ? 2 : 1) : tierOrDouble;
 
-    if (!isDoubleJump) {
+    if (tier === 1) {
       // Normal ground jump: Servo leap sound
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -124,7 +125,7 @@ export class AudioManager {
       gain.connect(this.ctx.destination);
       osc.start(t);
       osc.stop(t + 0.17);
-    } else {
+    } else if (tier === 2) {
       // Double Jump: Sci-Fi Neon Thruster Pulse
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -145,6 +146,33 @@ export class AudioManager {
       gain.connect(this.ctx.destination);
       osc.start(t);
       osc.stop(t + 0.23);
+    } else {
+      // Triple Jump: High-velocity Sonic Bloom & Shimmer Chime
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(520, t);
+      osc1.frequency.exponentialRampToValueAtTime(1450, t + 0.22);
+
+      gain1.gain.setValueAtTime(0.42, t);
+      gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+      osc1.connect(gain1);
+      gain1.connect(this.ctx.destination);
+      osc1.start(t);
+      osc1.stop(t + 0.28);
+
+      // Shimmer accent
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1046.5, t);
+      osc2.frequency.exponentialRampToValueAtTime(2093, t + 0.18);
+      gain2.gain.setValueAtTime(0.25, t);
+      gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+      osc2.connect(gain2);
+      gain2.connect(this.ctx.destination);
+      osc2.start(t);
+      osc2.stop(t + 0.22);
     }
   }
 

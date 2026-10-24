@@ -353,6 +353,27 @@ export class IsometricWorld {
   }
 
   /**
+   * Probes surface normal directly beneath coordinate (x, z) to dynamically align contact shadows to ramps and slopes.
+   */
+  public getTerrainNormal(x: number, z: number, fromY: number = 0.0): THREE.Vector3 {
+    this.group.updateMatrixWorld(true);
+    const startY = fromY + 0.45;
+    this.raycaster.set(new THREE.Vector3(x, startY, z), this.downVector);
+    this.raycaster.far = 40.0;
+
+    const hits = this.raycaster.intersectObjects(this.terrainColliders, false);
+    for (const hit of hits) {
+      if (hit.point.y <= fromY + 0.42 && hit.face) {
+        const normal = hit.face.normal.clone();
+        normal.transformDirection(hit.object.matrixWorld).normalize();
+        return normal;
+      }
+    }
+
+    return new THREE.Vector3(0, 1, 0);
+  }
+
+  /**
    * Prevents flying or jumping up through solid platforms from underneath.
    */
   public resolveCeilingCollision(pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight: number = 1.8): void {
