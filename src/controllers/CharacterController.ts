@@ -62,6 +62,7 @@ export class CharacterController {
   public readonly bodyRadius: number = 0.35;
   private jumpCount: number = 0;
   private readonly maxJumps: number = 2;
+  private coyoteTimer: number = 0;
   private sceneRef: THREE.Scene;
   private jumpRings: { mesh: THREE.Mesh; timer: number; maxTime: number }[] = [];
 
@@ -701,12 +702,20 @@ export class CharacterController {
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     const isMoving = inputMoving && horizontalSpeed > 0.05;
 
+    // Coyote time: gives a generous 0.16s window to jump even right after leaving a ledge or traversing diagonal terrain steps
+    if (this.isGrounded) {
+      this.coyoteTimer = 0.16;
+    } else {
+      this.coyoteTimer = Math.max(0, this.coyoteTimer - dt);
+    }
+
     // 2. Jump & Jetpack Flight Handling
     if (jumpPressed) {
-      if (this.isGrounded) {
-        // First jump from ground
+      if (this.isGrounded || this.coyoteTimer > 0) {
+        // First jump from ground (or ledge coyote grace)
         this.velocity.y = this.jumpForce;
         this.isGrounded = false;
+        this.coyoteTimer = 0;
         this.jumpCount = 1;
         this.audio.playJump(false);
         this.playAnimation(CharacterState.JUMP, 0.08);

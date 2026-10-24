@@ -155,7 +155,7 @@ class DetourGame {
     const dt = Math.min(this.clock.getDelta(), 0.05);
 
     // 1. Process Input
-    this.inputManager.update();
+    this.inputManager.update(dt);
     this.inputManager.updateAimTarget(this.cameraSystem.camera, this.character.position.y);
     const jumpPressed = this.inputManager.consumeJump();
 

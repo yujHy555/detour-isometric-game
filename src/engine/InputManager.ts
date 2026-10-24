@@ -21,6 +21,7 @@ export class InputManager {
   public isAiming: boolean = false;
   public isRunning: boolean = false;
   public jumpJustPressed: boolean = false;
+  public jumpBufferTimer: number = 0;
   public actionJustPressed: boolean = false;
   public isJetpackHeld: boolean = false;
   public isMobile: boolean = false;
@@ -100,11 +101,27 @@ export class InputManager {
       this.keys[e.key.toLowerCase()] = true;
     }
 
-    // Support Space, as well as KeyJ / KeyK (to bypass keyboard ghosting on membrane keyboards when pressing multiple WASD keys simultaneously)
-    if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32 || e.code === 'KeyJ' || e.code === 'KeyK') {
+    // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, V, J, K, Numpad0
+    // Left Alt and C reside on separate matrix lines from W+A, completely bypassing hardware keyboard ghosting
+    const isJumpKey = (
+      e.code === 'Space' ||
+      e.key === ' ' ||
+      e.keyCode === 32 ||
+      e.code === 'AltLeft' ||
+      e.code === 'AltRight' ||
+      e.code === 'KeyC' ||
+      e.code === 'KeyV' ||
+      e.code === 'KeyJ' ||
+      e.code === 'KeyK' ||
+      e.code === 'Numpad0'
+    );
+
+    if (isJumpKey) {
       e.preventDefault();
       this.jumpJustPressed = true;
+      this.jumpBufferTimer = 0.22; // 220ms input buffer
     }
+
     if (e.code === 'KeyE' || e.code === 'KeyF' || e.key === 'e' || e.key === 'f') {
       this.actionJustPressed = true;
     }
@@ -243,7 +260,12 @@ export class InputManager {
     }
   }
 
-  public update() {
+  public update(dt: number = 0.016) {
+    // Input jump buffer decay
+    if (this.jumpBufferTimer > 0) {
+      this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - dt);
+    }
+
     let screenX = 0;
     let screenZ = 0;
     let sprintPressed = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.touchSprintActive);
@@ -383,8 +405,9 @@ export class InputManager {
   }
 
   public consumeJump(): boolean {
-    if (this.jumpJustPressed) {
+    if (this.jumpJustPressed || this.jumpBufferTimer > 0) {
       this.jumpJustPressed = false;
+      this.jumpBufferTimer = 0;
       return true;
     }
     return false;
