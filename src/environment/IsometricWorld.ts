@@ -8,10 +8,20 @@ export interface RampDefinition {
   length: number;
 }
 
+export interface SkyPlatformDef {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  topY: number;
+  bottomY: number;
+}
+
 export class IsometricWorld {
   public group: THREE.Group;
   public terrainColliders: THREE.Object3D[] = [];
   private ramps: RampDefinition[] = [];
+  private skyPlatforms: SkyPlatformDef[] = [];
   private keyLight!: THREE.DirectionalLight;
   private ambientLight!: THREE.AmbientLight;
 
@@ -28,19 +38,19 @@ export class IsometricWorld {
   }
 
   private setupLighting(scene: THREE.Scene) {
-    // Bright, natural daylight ambient light
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 2.2);
+    // Balanced, comfortable ambient fill (reduced brightness, gentle light grey tone)
+    this.ambientLight = new THREE.AmbientLight(0xd1d5db, 1.3);
     scene.add(this.ambientLight);
 
-    // Warm golden solar key light casting soft crisp contact shadows
-    this.keyLight = new THREE.DirectionalLight(0xfffaed, 2.4);
-    this.keyLight.position.set(-20, 34, 20);
+    // Warm solar directional key light (calibrated to 1.6 intensity for soft natural contrast)
+    this.keyLight = new THREE.DirectionalLight(0xfffaed, 1.6);
+    this.keyLight.position.set(-20, 36, 20);
     this.keyLight.castShadow = true;
     this.keyLight.shadow.mapSize.width = 2048;
     this.keyLight.shadow.mapSize.height = 2048;
     this.keyLight.shadow.camera.near = 0.5;
-    this.keyLight.shadow.camera.far = 100;
-    const d = 26;
+    this.keyLight.shadow.camera.far = 120;
+    const d = 28;
     this.keyLight.shadow.camera.left = -d;
     this.keyLight.shadow.camera.right = d;
     this.keyLight.shadow.camera.top = d;
@@ -48,24 +58,24 @@ export class IsometricWorld {
     this.keyLight.shadow.bias = -0.0003;
     scene.add(this.keyLight);
 
-    // Fresh sky azure rim fill light
-    const rim = new THREE.DirectionalLight(0x7dd3fc, 1.2);
-    rim.position.set(22, 14, -22);
+    // Cyan electric rim accent light
+    const rim = new THREE.DirectionalLight(0x38bdf8, 1.1);
+    rim.position.set(22, 16, -22);
     scene.add(rim);
 
     // Subtle warm ground bounce
-    const bounce = new THREE.DirectionalLight(0xfef08a, 0.3);
+    const bounce = new THREE.DirectionalLight(0xfde047, 0.2);
     bounce.position.set(0, -10, 0);
     scene.add(bounce);
   }
 
   private buildTerrain() {
-    // 1. Base Grid Floor (Height = 0) - Light Architectural Porcelain
+    // 1. Base Grid Floor (Height = 0) - Sophisticated Light Grey Architectural Slate
     const floorGeo = new THREE.PlaneGeometry(80, 80);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      roughness: 0.45,
+      color: 0x94a3b8,
+      roughness: 0.5,
       metalness: 0.1
     });
     const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -73,16 +83,16 @@ export class IsometricWorld {
     this.group.add(floor);
     this.terrainColliders.push(floor);
 
-    // Clean dual-tone architectural grid
-    const grid = new THREE.GridHelper(80, 80, 0x0284c7, 0x94a3b8);
+    // Dual-tone architectural grid with electric cyan accents
+    const grid = new THREE.GridHelper(80, 80, 0x00f0ff, 0x64748b);
     grid.position.y = 0.01;
     this.group.add(grid);
 
-    // 2. Central Raised Plaza (Height = 1.0, bounds: x [-8, 8], z [-8, 8]) - Pure Matte Pearl Podium
+    // 2. Central Raised Plaza (Height = 1.0, bounds: x [-8, 8], z [-8, 8]) - Refined Light Grey Stone
     const plazaGeo = new THREE.BoxGeometry(16, 1.0, 16);
     const plazaMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      roughness: 0.35,
+      color: 0xe2e8f0,
+      roughness: 0.4,
       metalness: 0.12
     });
     const plaza = new THREE.Mesh(plazaGeo, plazaMat);
@@ -92,11 +102,11 @@ export class IsometricWorld {
     this.group.add(plaza);
     this.terrainColliders.push(plaza);
 
-    // Minimalist Electric Blue Perimeter Edge Trim
+    // Electric Cyan Edge Trim
     const plazaEdges = new THREE.EdgesGeometry(plazaGeo);
     const plazaLine = new THREE.LineSegments(
       plazaEdges,
-      new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 2 })
+      new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 2 })
     );
     plazaLine.position.copy(plaza.position);
     this.group.add(plazaLine);
@@ -105,7 +115,7 @@ export class IsometricWorld {
     // South main ramp: Connects plaza z=8, y=1.0 down to ground z=14, y=0.0
     this.createRamp(0, 8, 5.0, 1.0, 6.0, 0);
 
-    // 4. Elevated Platforms - Light Limestone / Pearl Composite
+    // 4. Ground Elevated Platforms - Muted Slate-Grey Decks
     this.createPlatform(-12, 2.0, -8, 8, 8);
     this.createPlatform(14, 1.5, 10, 10, 6);
     this.createPlatform(10, 3.0, -12, 8, 8);
@@ -113,11 +123,75 @@ export class IsometricWorld {
     // Second ramp connecting Platform 2 south edge (z=13, y=1.5) down to ground (z=19, y=0.0)
     this.createRamp(14, 13, 4.0, 1.5, 6.0, 0);
 
-    // Decorative Sci-Fi Pillars & Beacons - Polished White Ceramic
+    // 5. High-Altitude Test Sky Platforms (Reachable with Jetpack)
+    // Sky Platform 1: Central Overlook (x: 0, topY: 5.2, z: -14, size: 10x8)
+    this.createSkyPlatform(0, 5.2, -14, 10, 8);
+
+    // Sky Platform 2: East Flight Deck (x: 16, topY: 7.4, z: -4, size: 8x8)
+    this.createSkyPlatform(16, 7.4, -4, 8, 8);
+
+    // Sky Platform 3: West High Apex Station (x: -16, topY: 9.8, z: 6, size: 8x8)
+    this.createSkyPlatform(-16, 9.8, 6, 8, 8);
+
+    // Decorative Sci-Fi Pillars & Beacons
     this.createPillar(-7, 7, 3.5);
     this.createPillar(7, 7, 3.5);
     this.createPillar(-7, -7, 3.5);
     this.createPillar(7, -7, 3.5);
+  }
+
+  /**
+   * Floating Sky Platform with Anti-Gravity Repulsor Rings & Full Collision
+   */
+  private createSkyPlatform(x: number, topY: number, z: number, w: number, d: number) {
+    const thickness = 0.7;
+    const centerY = topY - thickness / 2;
+
+    const geo = new THREE.BoxGeometry(w, thickness, d);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      roughness: 0.38,
+      metalness: 0.2
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, centerY, z);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    this.group.add(mesh);
+    this.terrainColliders.push(mesh);
+
+    // Register bounding box for horizontal collision
+    this.skyPlatforms.push({
+      minX: x - w / 2,
+      maxX: x + w / 2,
+      minZ: z - d / 2,
+      maxZ: z + d / 2,
+      topY: topY,
+      bottomY: topY - thickness
+    });
+
+    // Glowing Neon Edge Perimeter
+    const edges = new THREE.EdgesGeometry(geo);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 2 });
+    const line = new THREE.LineSegments(edges, lineMat);
+    line.position.copy(mesh.position);
+    this.group.add(line);
+
+    // Anti-gravity repulsor emitter ring on underside
+    const ringGeo = new THREE.RingGeometry(1.2, 1.8, 24);
+    ringGeo.rotateX(Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      side: THREE.DoubleSide
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(x, topY - thickness - 0.02, z);
+    this.group.add(ring);
+
+    // Downward repulsor beacon light
+    const repLight = new THREE.PointLight(0x00f0ff, 1.5, 10);
+    repLight.position.set(x, topY - thickness - 0.3, z);
+    this.group.add(repLight);
   }
 
   /**
@@ -136,7 +210,6 @@ export class IsometricWorld {
     const hw = width / 2;
     const geom = new THREE.BufferGeometry();
 
-    // Vertices for a solid ramp: Top slope, back wall, left/right triangle sides, bottom
     const vertices = [
       // Top sloped surface (CCW viewed from above)
       -hw, height, 0,
@@ -180,8 +253,8 @@ export class IsometricWorld {
     geom.computeVertexNormals();
 
     const rampMat = new THREE.MeshStandardMaterial({
-      color: 0xedf2f7,
-      roughness: 0.4,
+      color: 0xcbd5e1,
+      roughness: 0.45,
       metalness: 0.15,
       side: THREE.DoubleSide
     });
@@ -194,7 +267,7 @@ export class IsometricWorld {
     this.terrainColliders.push(rampMesh);
 
     // Clean Runway Floor Guide Lines along the slope
-    const railMat = new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 2 });
+    const railMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 2 });
     const leftRailGeo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(-hw + 0.05, height + 0.015, 0),
       new THREE.Vector3(-hw + 0.05, 0.015, length)
@@ -213,7 +286,7 @@ export class IsometricWorld {
   private createPlatform(x: number, y: number, z: number, w: number, d: number) {
     const geo = new THREE.BoxGeometry(w, y, d);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xf1f5f9,
+      color: 0xcbd5e1,
       roughness: 0.4,
       metalness: 0.15
     });
@@ -224,9 +297,9 @@ export class IsometricWorld {
     this.group.add(mesh);
     this.terrainColliders.push(mesh);
 
-    // Electric blue edge trim
+    // Cyan edge trim
     const edges = new THREE.EdgesGeometry(geo);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x0284c7, linewidth: 2 });
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 2 });
     const line = new THREE.LineSegments(edges, lineMat);
     line.position.copy(mesh.position);
     this.group.add(line);
@@ -235,9 +308,9 @@ export class IsometricWorld {
   private createPillar(x: number, z: number, h: number) {
     const geo = new THREE.CylinderGeometry(0.3, 0.38, h, 16);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      metalness: 0.25,
-      roughness: 0.2
+      color: 0xe2e8f0,
+      metalness: 0.35,
+      roughness: 0.25
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, h / 2, z);
@@ -247,25 +320,24 @@ export class IsometricWorld {
     // Glowing cyan beacon cap
     const cap = new THREE.Mesh(
       new THREE.SphereGeometry(0.2, 12, 12),
-      new THREE.MeshBasicMaterial({ color: 0x0284c7 })
+      new THREE.MeshBasicMaterial({ color: 0x00f0ff })
     );
     cap.position.set(x, h + 0.1, z);
     this.group.add(cap);
 
     // Beacon point light
-    const pl = new THREE.PointLight(0x0284c7, 1.2, 8);
+    const pl = new THREE.PointLight(0x00f0ff, 1.2, 8);
     pl.position.set(x, h + 0.2, z);
     this.group.add(pl);
   }
 
   /**
-   * Downward raycast targeting only walkable terrain surfaces (Floor, Plaza, Platforms, Ramps).
-   * Excludes pillars and non-walkable items to prevent erroneous mid-air landing heights.
+   * Downward raycast targeting only walkable terrain surfaces (Floor, Plaza, Platforms, Sky Platforms, Ramps).
    */
   public getTerrainHeight(x: number, z: number, fromY: number = 2.0): number {
-    const startY = Math.max(fromY + 1.5, 4.0);
+    const startY = Math.max(fromY + 1.5, 12.0);
     this.raycaster.set(new THREE.Vector3(x, startY, z), this.downVector);
-    this.raycaster.far = 30.0;
+    this.raycaster.far = 35.0;
 
     const hits = this.raycaster.intersectObjects(this.terrainColliders, false);
     if (hits.length > 0) {
@@ -276,8 +348,7 @@ export class IsometricWorld {
   }
 
   /**
-   * True 2.5D Capsule/Cylinder vs AABB & Ramp Side Walls obstacle solver.
-   * Completely avoids any teleportation or artificial position jumps.
+   * True 2.5D Capsule/Cylinder obstacle solver with full sky platform and ramp collision.
    */
   public resolveHorizontalCollision(pos: THREE.Vector3, radius: number = 0.35): THREE.Vector3 {
     // 1. World Boundaries (80x80 floor, bounds [-38, 38])
@@ -336,12 +407,18 @@ export class IsometricWorld {
       this.resolveBox(pos, radius, 6, 14, -16, -8);
     }
 
+    // 8. High-Altitude Sky Platforms Horizontal Side Collision
+    for (const sp of this.skyPlatforms) {
+      if (pos.y >= sp.bottomY - 0.2 && pos.y < sp.topY - 0.1) {
+        this.resolveBox(pos, radius, sp.minX, sp.maxX, sp.minZ, sp.maxZ);
+      }
+    }
+
     return pos;
   }
 
   /**
    * Prevents penetrating into the ramp's triangular side walls from ground level.
-   * NEVER pushes inward or snaps players who are on the ramp or flying.
    */
   private resolveRampSides(pos: THREE.Vector3, r: number, ramp: RampDefinition) {
     const hw = ramp.width / 2;
@@ -359,14 +436,11 @@ export class IsometricWorld {
     const t = THREE.MathUtils.clamp((pos.z - ramp.startZ) / ramp.length, 0, 1);
     const surfaceY = ramp.height * (1.0 - t);
 
-    // Solid side walls: ONLY blocks when character is lower than the ramp slope (e.g. walking on ground outside)
+    // Solid side walls: ONLY blocks when character is lower than the ramp slope
     if (pos.y < surfaceY - 0.08) {
-      // Approaching from outside left towards the triangular side wall
       if (pos.x < minX && pos.x + r > minX) {
         pos.x = minX - r;
-      }
-      // Approaching from outside right towards the triangular side wall
-      else if (pos.x > maxX && pos.x - r < maxX) {
+      } else if (pos.x > maxX && pos.x - r < maxX) {
         pos.x = maxX + r;
       }
     }
@@ -392,7 +466,6 @@ export class IsometricWorld {
       pos.x += (dx / dist) * overlap;
       pos.z += (dz / dist) * overlap;
     } else if (distSq <= 0.000001) {
-      // Center penetrated inside box: push out to nearest edge
       const leftDist = pos.x - minX;
       const rightDist = maxX - pos.x;
       const topDist = pos.z - minZ;

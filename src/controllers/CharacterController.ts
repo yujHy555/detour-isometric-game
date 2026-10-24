@@ -28,10 +28,16 @@ export class CharacterController {
   private actions: Map<string, THREE.AnimationAction> = new Map();
   private currentAction?: THREE.AnimationAction;
 
-  // Jetpack Flight System
+  // Jetpack Flight System & Dual AAA Flames
   public isFlying: boolean = false;
   private flyTimer: number = 0;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
+  private spineBone?: THREE.Bone;
+  private jetpackFlamesGroup!: THREE.Group;
+  private flameLeft!: THREE.Group;
+  private flameRight!: THREE.Group;
+  private tempPos: THREE.Vector3 = new THREE.Vector3();
+  private tempQuat: THREE.Quaternion = new THREE.Quaternion();
 
   // Procedural Rig Parts (Fallback before custom model is loaded)
   private leftLeg?: THREE.Mesh;
@@ -68,6 +74,7 @@ export class CharacterController {
 
     this.createContactShadow(scene);
     this.createProceduralRig();
+    this.createJetpackFlames(scene);
     this.attemptLoadCustomModel();
   }
 
@@ -189,28 +196,49 @@ export class CharacterController {
               return;
             }
 
+            // Detect upper spine bone to perfectly align jetpack flame angle
+            if ((child as THREE.Bone).isBone && child.name.toLowerCase().includes('spine_03')) {
+              this.spineBone = child as THREE.Bone;
+            }
+
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
               mesh.castShadow = true;
               mesh.receiveShadow = true;
 
-              // Clean material setup without emission textures
+              // Super cool transparent physical glass material for helmet and visor
               const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-              for (const m of materials) {
+              const updatedMats = materials.map((m) => {
                 if (m instanceof THREE.MeshStandardMaterial) {
                   const matName = m.name.toLowerCase();
-                  if (matName.includes('glass')) {
-                    m.transparent = true;
-                    m.opacity = 0.85;
-                    m.roughness = 0.12;
-                    m.metalness = 0.85;
+                  if (matName.includes('glass') || nameLower.includes('helmet') || nameLower.includes('visor')) {
+                    return new THREE.MeshPhysicalMaterial({
+                      color: new THREE.Color(0xdbeafe),
+                      transmission: 0.92,
+                      opacity: 0.28,
+                      transparent: true,
+                      roughness: 0.04,
+                      metalness: 0.05,
+                      ior: 1.52,
+                      reflectivity: 0.95,
+                      clearcoat: 1.0,
+                      clearcoatRoughness: 0.04,
+                      depthWrite: false,
+                      side: THREE.DoubleSide
+                    });
                   }
-                  // Clear emissive maps / flashing
                   m.emissive.setHex(0x000000);
                   m.emissiveMap = null;
                   m.emissiveIntensity = 0;
                   m.needsUpdate = true;
                 }
+                return m;
+              });
+
+              if (Array.isArray(mesh.material)) {
+                mesh.material = updatedMats;
+              } else {
+                mesh.material = updatedMats[0];
               }
             }
           });
@@ -393,31 +421,96 @@ export class CharacterController {
     }
   }
 
-  private spawnThrusterParticle() {
-    const geo = new THREE.SphereGeometry(0.06, 6, 6);
+  /**
+   * Creates dual Triple-AAA sci-fi jetpack flames with soft edges, additive blending, and corona rings
+   */
+  private createJetpackFlames(scene: THREE.Scene) {
+    this.jetpackFlamesGroup = new THREE.Group();
+    this.jetpackFlamesGroup.visible = false;
+    scene.add(this.jetpackFlamesGroup);
+
+    const createSingleFlame = () => {
+      const flame = new THREE.Group();
+
+      // 1. Inner intense plasma core (White / pale cyan)
+      const coreGeo = new THREE.CylinderGeometry(0.024, 0.005, 0.34, 10);
+      coreGeo.translate(0, -0.17, 0); // Origin at nozzle exit, shoots down along -Y
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      flame.add(coreMesh);
+
+      // 2. Outer soft bloom plume (Electric cyan / soft edges)
+      const glowGeo = new THREE.CylinderGeometry(0.065, 0.012, 0.44, 14);
+      glowGeo.translate(0, -0.22, 0);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.58,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+      flame.add(glowMesh);
+
+      // 3. Glowing corona ring right at the nozzle base
+      const ringGeo = new THREE.RingGeometry(0.02, 0.065, 16);
+      ringGeo.rotateX(Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      flame.add(ringMesh);
+
+      return flame;
+    };
+
+    // Twin nozzles attached to left and right thrusters
+    this.flameLeft = createSingleFlame();
+    this.flameLeft.position.set(-0.14, 0, 0);
+    this.jetpackFlamesGroup.add(this.flameLeft);
+
+    this.flameRight = createSingleFlame();
+    this.flameRight.position.set(0.14, 0, 0);
+    this.jetpackFlamesGroup.add(this.flameRight);
+  }
+
+  private spawnSoftExhaustPuff(flameNode: THREE.Group) {
+    const geo = new THREE.SphereGeometry(0.045, 8, 8);
     const mat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.85,
-      depthWrite: false
+      opacity: 0.75,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
     });
     const p = new THREE.Mesh(geo, mat);
-    const backOffset = -0.22;
-    const sinR = Math.sin(this.group.rotation.y);
-    const cosR = Math.cos(this.group.rotation.y);
-    const px = this.position.x + backOffset * sinR + (Math.random() - 0.5) * 0.15;
-    const py = this.position.y + 0.65;
-    const pz = this.position.z + backOffset * cosR + (Math.random() - 0.5) * 0.15;
-    p.position.set(px, py, pz);
+
+    // Get flame nozzle tip in world space
+    const tipLocal = new THREE.Vector3(0, -0.32, 0);
+    flameNode.localToWorld(tipLocal);
+    p.position.copy(tipLocal);
     this.sceneRef.add(p);
 
+    // Puff drifts backward along flame alignment
+    const driftDir = new THREE.Vector3(0, -1, 0).applyQuaternion(this.jetpackFlamesGroup.quaternion).multiplyScalar(1.6);
     this.thrusterParticles.push({
       mesh: p,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: -2.8 - Math.random() * 1.5,
-      vz: (Math.random() - 0.5) * 0.4,
+      vx: driftDir.x + (Math.random() - 0.5) * 0.3,
+      vy: driftDir.y + (Math.random() - 0.5) * 0.3,
+      vz: driftDir.z + (Math.random() - 0.5) * 0.3,
       timer: 0,
-      maxTime: 0.22 + Math.random() * 0.08
+      maxTime: 0.20 + Math.random() * 0.08
     });
   }
 
@@ -435,9 +528,9 @@ export class CharacterController {
         tp.mesh.position.x += tp.vx * dt;
         tp.mesh.position.y += tp.vy * dt;
         tp.mesh.position.z += tp.vz * dt;
-        const scale = 1.0 + progress * 2.0;
+        const scale = 1.0 + progress * 2.5;
         tp.mesh.scale.set(scale, scale, scale);
-        (tp.mesh.material as THREE.MeshBasicMaterial).opacity = (1.0 - progress) * 0.85;
+        (tp.mesh.material as THREE.MeshBasicMaterial).opacity = (1.0 - progress) * 0.75;
       }
     }
   }
@@ -537,24 +630,19 @@ export class CharacterController {
       this.flyTimer += dt;
       this.isGrounded = false;
 
-      // Spawn thruster particles
-      if (Math.random() < 0.72) {
-        this.spawnThrusterParticle();
-      }
-
-      // Initial lift-off: if starting from stationary ground, float up slowly in idle pose
-      if (this.flyTimer < 0.42 && !isMoving && !this.wasInAir) {
-        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 2.2, dt * 5.0);
+      // Initial lift-off: if starting from stationary ground, float up gently in idle pose
+      if (this.flyTimer < 0.38 && !isMoving && !this.wasInAir) {
+        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 1.8, dt * 5.0);
       } else {
-        // Full flight ascent & animation
-        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 4.8, dt * 7.0);
+        // Controlled, comfortable hover & ascent (more horizontal than vertical)
+        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 2.5, dt * 6.0);
       }
 
-      // Responsive horizontal aerial locomotion while jetpacking
+      // Fast, responsive horizontal aerial locomotion (moves more horizontally than vertically)
       if (inputMoving) {
-        const flyHozSpeed = this.runSpeed * 1.15;
-        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveVector.x * flyHozSpeed, dt * 10.0);
-        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveVector.z * flyHozSpeed, dt * 10.0);
+        const flyHozSpeed = this.runSpeed * 1.6;
+        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveVector.x * flyHozSpeed, dt * 14.0);
+        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveVector.z * flyHozSpeed, dt * 14.0);
       }
     } else {
       if (this.isFlying) {
@@ -567,6 +655,39 @@ export class CharacterController {
       if (!this.isGrounded) {
         this.velocity.y += this.gravity * dt;
       }
+    }
+
+    // Update Twin Jetpack Flame Angles & Alignment
+    if (this.isFlying) {
+      this.jetpackFlamesGroup.visible = true;
+
+      if (this.spineBone) {
+        this.spineBone.getWorldPosition(this.tempPos);
+        this.spineBone.getWorldQuaternion(this.tempQuat);
+
+        // Backpack is attached to upper spine; offset to nozzle base
+        const backOffset = new THREE.Vector3(0, -0.14, -0.28).applyQuaternion(this.tempQuat);
+        this.jetpackFlamesGroup.position.copy(this.tempPos).add(backOffset);
+        this.jetpackFlamesGroup.quaternion.copy(this.tempQuat);
+      } else {
+        const rotY = this.group.rotation.y;
+        const backOffset = new THREE.Vector3(-Math.sin(rotY) * 0.22, 0.95, -Math.cos(rotY) * 0.22);
+        this.jetpackFlamesGroup.position.copy(this.position).add(backOffset);
+        this.jetpackFlamesGroup.rotation.set(0, rotY, 0);
+      }
+
+      // High-Frequency Soft-Edge Flame Pulse & Flicker
+      const flicker = 1.0 + Math.sin(this.flyTimer * 48.0) * 0.16 + (Math.random() - 0.5) * 0.10;
+      this.flameLeft.scale.set(1.0, flicker, 1.0);
+      this.flameRight.scale.set(1.0, flicker, 1.0);
+
+      // Trailing soft exhaust puffs
+      if (Math.random() < 0.6) {
+        this.spawnSoftExhaustPuff(this.flameLeft);
+        this.spawnSoftExhaustPuff(this.flameRight);
+      }
+    } else {
+      this.jetpackFlamesGroup.visible = false;
     }
 
     // Integrate Horizontal Motion

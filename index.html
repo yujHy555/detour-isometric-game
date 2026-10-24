@@ -226,18 +226,17 @@
       font-size: 0.72rem;
     }
 
-    /* Sci-Fi Holographic Gamepad HUD Graphic */
+    /* Sci-Fi Gamepad Holographic Overlay (Seamless Transparent, Non-Windowed) */
     #gamepad-hud {
       position: absolute;
       bottom: 24px;
-      right: 20px;
-      width: 270px;
-      background: rgba(11, 15, 28, 0.90);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(56, 189, 248, 0.05);
-      backdrop-filter: blur(12px);
+      right: 24px;
+      width: 320px;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      padding: 0;
       pointer-events: auto;
       z-index: 15;
       transition: opacity 0.3s ease, transform 0.3s ease;
@@ -251,52 +250,56 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: none;
     }
     .gamepad-hud-title {
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 700;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
       color: #38bdf8;
       text-transform: uppercase;
       display: flex;
       align-items: center;
       gap: 6px;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
     }
     .gp-status-tag {
-      font-size: 0.65rem;
-      padding: 2px 6px;
+      font-size: 0.72rem;
+      padding: 3px 8px;
       border-radius: 4px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      background: rgba(255, 255, 255, 0.08);
-      color: #94a3b8;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      background: rgba(15, 23, 42, 0.75);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(4px);
     }
     .gp-status-tag.active {
-      background: rgba(16, 185, 129, 0.2);
+      background: rgba(16, 185, 129, 0.35);
       color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+      border: 1px solid rgba(16, 185, 129, 0.6);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
     }
 
     /* Controller Vector Graphic */
     .gp-svg-container {
       width: 100%;
-      height: 120px;
+      height: 145px;
       display: flex;
       justify-content: center;
       align-items: center;
+      filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.65));
     }
     .gp-svg {
       width: 100%;
       height: 100%;
     }
     .gp-body {
-      fill: #141b2e;
-      stroke: #334155;
-      stroke-width: 2;
+      fill: rgba(15, 23, 42, 0.65);
+      stroke: #38bdf8;
+      stroke-width: 2.2;
     }
     .gp-stick-base {
       fill: #0c111f;
@@ -366,22 +369,25 @@
     .gamepad-hud-legend {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 4px 8px;
-      margin-top: 8px;
+      gap: 6px 14px;
+      margin-top: 10px;
       padding-top: 8px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      font-size: 0.68rem;
-      color: #94a3b8;
+      border-top: 1px solid rgba(56, 189, 248, 0.3);
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #ffffff;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
     }
     .gp-legend-item {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 7px;
     }
     .gp-legend-dot {
-      width: 6px;
-      height: 6px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
+      flex-shrink: 0;
     }
 
     /* Mobile Controls (Virtual Joystick & Action Buttons) */
@@ -598,11 +604,15 @@
     <div class="gamepad-hud-legend">
       <div class="gp-legend-item">
         <span class="gp-legend-dot" style="background:#10b981;"></span>
-        <span><strong>A:</strong> Jump / Double</span>
+        <span><strong>A:</strong> Jump / 2X</span>
       </div>
       <div class="gp-legend-item">
         <span class="gp-legend-dot" style="background:#ef4444;"></span>
         <span><strong>B / RT:</strong> Sprint</span>
+      </div>
+      <div class="gp-legend-item">
+        <span class="gp-legend-dot" style="background:#eab308;"></span>
+        <span><strong>Y / LB:</strong> Jetpack Fly</span>
       </div>
       <div class="gp-legend-item">
         <span class="gp-legend-dot" style="background:#3b82f6;"></span>
@@ -610,7 +620,11 @@
       </div>
       <div class="gp-legend-item">
         <span class="gp-legend-dot" style="background:#38bdf8;"></span>
-        <span><strong>L-Stick:</strong> Iso Move</span>
+        <span><strong>L-Stick:</strong> Move (Iso)</span>
+      </div>
+      <div class="gp-legend-item">
+        <span class="gp-legend-dot" style="background:#60a5fa;"></span>
+        <span><strong>R-Stick:</strong> Aim</span>
       </div>
     </div>
   </div>
