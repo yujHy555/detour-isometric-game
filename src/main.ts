@@ -60,7 +60,8 @@ class DetourGame {
     this.collectibles = new CollectibleManager(
       this.scene,
       undefined,
-      (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY)
+      (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
+      (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
 
     // Initial character spawn on Central Plaza

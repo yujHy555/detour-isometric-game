@@ -54,6 +54,8 @@ export class InputManager {
   private touchMoveVector: { x: number; y: number } = { x: 0, y: 0 };
   private touchSprintActive: boolean = false;
   private touchJetpackActive: boolean = false;
+  private joystickTouchId: number | null = null;
+  private jetpackTouchId: number | null = null;
 
   // Direction offset: -45° for Isometric mode, 0° for 3rd Person follow mode
   private isoAngle: number = -Math.PI / 4;
@@ -115,12 +117,31 @@ export class InputManager {
   private onKeyDown(e: KeyboardEvent) {
     this.lastInputType = 'keyboard';
     this.keys[e.code] = true;
+    if (e.key) {
+      this.keys[e.key] = true;
+    }
     if (e.shiftKey || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       this.shiftDown = true;
     }
 
-    // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, J, K, Numpad0
-    // Checking code, key, keyCode, and which covers every browser implementation
+    // Prevent default browser scrolling and spatial focus navigation for arrow and jump keys
+    if (
+      e.code === 'ArrowUp' ||
+      e.code === 'ArrowDown' ||
+      e.code === 'ArrowLeft' ||
+      e.code === 'ArrowRight' ||
+      e.code === 'Space' ||
+      e.key === ' ' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight'
+    ) {
+      e.preventDefault();
+    }
+
+    // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, Z, X, J, K, Numpad0, ControlRight, ControlLeft, Enter
+    // Checking code, key, keyCode, and which covers every browser implementation and is immune to arrow-key matrix ghosting
     const isJumpKey = (
       e.code === 'Space' ||
       e.key === ' ' ||
@@ -129,9 +150,14 @@ export class InputManager {
       e.code === 'AltLeft' ||
       e.code === 'AltRight' ||
       e.code === 'KeyC' ||
+      e.code === 'KeyZ' ||
+      e.code === 'KeyX' ||
       e.code === 'KeyJ' ||
       e.code === 'KeyK' ||
-      e.code === 'Numpad0'
+      e.code === 'Numpad0' ||
+      e.code === 'ControlRight' ||
+      e.code === 'ControlLeft' ||
+      e.code === 'Enter'
     );
 
     if (isJumpKey) {
@@ -141,18 +167,21 @@ export class InputManager {
     }
 
     // Camera Mode Toggle Key: V
-    if (e.code === 'KeyV') {
+    if (e.code === 'KeyV' || e.key === 'v' || e.key === 'V') {
       e.preventDefault();
       this.cameraToggleRequested = true;
     }
 
-    if (e.code === 'KeyE' || e.code === 'KeyF') {
+    if (e.code === 'KeyE' || e.code === 'KeyF' || e.key === 'e' || e.key === 'f') {
       this.actionJustPressed = true;
     }
   }
 
   private onKeyUp(e: KeyboardEvent) {
     this.keys[e.code] = false;
+    if (e.key) {
+      this.keys[e.key] = false;
+    }
     this.shiftDown = e.shiftKey;
   }
 
@@ -178,32 +207,50 @@ export class InputManager {
     const btnJetpack = document.getElementById('btn-touch-jetpack');
 
     if (joystickZone && joystickKnob) {
-      joystickZone.addEventListener('touchstart', (e) => {
+      // Touch start on joystick zone: capture this touch's identifier so other touches (like JET) never interfere
+      joystickZone.addEventListener('touchstart', (e: TouchEvent) => {
         this.lastInputType = 'touch';
-        const rect = joystickZone.getBoundingClientRect();
-        this.touchActive = true;
-        this.touchStartPos = {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2
-        };
-        const touch = e.touches[0];
-        this.handleJoystickMove(touch.clientX, touch.clientY, joystickKnob);
-      }, { passive: true });
+        if (this.joystickTouchId === null && e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          this.joystickTouchId = touch.identifier;
+          const rect = joystickZone.getBoundingClientRect();
+          this.touchActive = true;
+          this.touchStartPos = {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          };
+          this.handleJoystickMove(touch.clientX, touch.clientY, joystickKnob);
+        }
+      }, { passive: false });
 
-      joystickZone.addEventListener('touchmove', (e) => {
-        if (!this.touchActive) return;
-        const touch = e.touches[0];
-        this.handleJoystickMove(touch.clientX, touch.clientY, joystickKnob);
-      }, { passive: true });
+      // Window-level touchmove: maintains smooth joystick steering even when thumb moves slightly outside the zone
+      window.addEventListener('touchmove', (e: TouchEvent) => {
+        if (!this.touchActive || this.joystickTouchId === null) return;
+        for (let i = 0; i < e.touches.length; i++) {
+          const t = e.touches[i];
+          if (t.identifier === this.joystickTouchId) {
+            this.handleJoystickMove(t.clientX, t.clientY, joystickKnob);
+            break;
+          }
+        }
+      }, { passive: false });
 
-      const resetJoystick = () => {
-        this.touchActive = false;
-        joystickKnob.style.transform = 'translate(0px, 0px)';
-        this.touchMoveVector = { x: 0, y: 0 };
+      const handleJoystickEnd = (e: TouchEvent) => {
+        if (this.joystickTouchId !== null) {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === this.joystickTouchId) {
+              this.touchActive = false;
+              this.joystickTouchId = null;
+              joystickKnob.style.transform = 'translate(0px, 0px)';
+              this.touchMoveVector = { x: 0, y: 0 };
+              break;
+            }
+          }
+        }
       };
 
-      joystickZone.addEventListener('touchend', resetJoystick);
-      joystickZone.addEventListener('touchcancel', resetJoystick);
+      window.addEventListener('touchend', handleJoystickEnd);
+      window.addEventListener('touchcancel', handleJoystickEnd);
     }
 
     if (btnJump) {
@@ -232,20 +279,37 @@ export class InputManager {
     }
 
     if (btnJetpack) {
-      btnJetpack.addEventListener('touchstart', (e) => {
+      // Track jetpack touch identifier independently so joystick moves never affect or cancel jetpack
+      btnJetpack.addEventListener('touchstart', (e: TouchEvent) => {
         e.preventDefault();
         this.lastInputType = 'touch';
+        if (e.changedTouches.length > 0) {
+          this.jetpackTouchId = e.changedTouches[0].identifier;
+        }
         this.touchJetpackActive = true;
         btnJetpack.classList.add('active');
-      });
+      }, { passive: false });
 
       const stopJet = (e: TouchEvent) => {
-        e.preventDefault();
-        this.touchJetpackActive = false;
-        btnJetpack.classList.remove('active');
+        if (this.jetpackTouchId !== null) {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === this.jetpackTouchId) {
+              this.touchJetpackActive = false;
+              this.jetpackTouchId = null;
+              btnJetpack.classList.remove('active');
+              break;
+            }
+          }
+        } else {
+          this.touchJetpackActive = false;
+          btnJetpack.classList.remove('active');
+        }
       };
+
       btnJetpack.addEventListener('touchend', stopJet);
       btnJetpack.addEventListener('touchcancel', stopJet);
+      window.addEventListener('touchend', stopJet);
+      window.addEventListener('touchcancel', stopJet);
     }
   }
 
@@ -410,7 +474,7 @@ export class InputManager {
     }
 
     // Jetpack Input: Strictly 'B' key on keyboard, touch Jet button on mobile, or Gamepad Y / LB
-    const kbJetpack = !!this.keys['KeyB'];
+    const kbJetpack = !!(this.keys['KeyB'] || this.keys['b'] || this.keys['B']);
     this.isJetpackHeld = kbJetpack || this.touchJetpackActive || gpJetpack;
 
     this.moveVector.set(screenX, 0, screenZ);
@@ -428,12 +492,18 @@ export class InputManager {
   public isJumpKeyHeld(): boolean {
     return !!(
       this.keys['Space'] ||
+      this.keys[' '] ||
       this.keys['AltLeft'] ||
       this.keys['AltRight'] ||
       this.keys['KeyC'] ||
+      this.keys['KeyZ'] ||
+      this.keys['KeyX'] ||
       this.keys['KeyJ'] ||
       this.keys['KeyK'] ||
-      this.keys['Numpad0']
+      this.keys['Numpad0'] ||
+      this.keys['ControlRight'] ||
+      this.keys['ControlLeft'] ||
+      this.keys['Enter']
     );
   }
 

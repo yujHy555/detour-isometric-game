@@ -520,14 +520,20 @@ export class CharacterController {
     this.updateDustPuffs(dt);
     this.updateThrusterParticles(dt);
 
-    // Triple Jump somersault flip animation
+    // Triple Jump somersault flip animation (pivoted from waist / center of mass at y = 0.95m)
     if (this.tripleJumpSpinTimer > 0) {
       this.tripleJumpSpinTimer = Math.max(0, this.tripleJumpSpinTimer - dt);
       if (this.modelMesh) {
         const progress = 1.0 - (this.tripleJumpSpinTimer / 0.45);
-        this.modelMesh.rotation.x = progress * Math.PI * 2;
+        const angle = progress * Math.PI * 2;
+        const waistY = 0.95;
+        // Offsets mesh so the somersault rotation pivots cleanly around the waist
+        this.modelMesh.position.y = waistY * (1.0 - Math.cos(angle));
+        this.modelMesh.position.z = -waistY * Math.sin(angle);
+        this.modelMesh.rotation.x = angle;
       }
-    } else if (this.modelMesh && this.modelMesh.rotation.x !== 0) {
+    } else if (this.modelMesh && (this.modelMesh.rotation.x !== 0 || this.modelMesh.position.y !== 0 || this.modelMesh.position.z !== 0)) {
+      this.modelMesh.position.set(0, 0, 0);
       this.modelMesh.rotation.x = 0;
     }
 

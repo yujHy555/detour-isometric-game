@@ -37,7 +37,8 @@ export class CollectibleManager {
   constructor(
     scene: THREE.Scene,
     audio?: AudioManager,
-    getTerrainHeight?: (x: number, z: number, fromY?: number) => number
+    getTerrainHeight?: (x: number, z: number, fromY?: number) => number,
+    getTerrainNormal?: (x: number, z: number, fromY?: number) => THREE.Vector3
   ) {
     this.scene = scene;
     this.audio = audio || new AudioManager();
@@ -117,11 +118,14 @@ export class CollectibleManager {
     this.vfxRing.visible = false;
     this.scene.add(this.vfxRing);
 
-    this.spawnAllCores(getTerrainHeight);
+    this.spawnAllCores(getTerrainHeight, getTerrainNormal);
     this.updateHUD();
   }
 
-  private spawnAllCores(getTerrainHeight?: (x: number, z: number, fromY?: number) => number) {
+  private spawnAllCores(
+    getTerrainHeight?: (x: number, z: number, fromY?: number) => number,
+    getTerrainNormal?: (x: number, z: number, fromY?: number) => THREE.Vector3
+  ) {
     // 12 Cyber Energy Cores in fixed, strategic positions across ground, ramps, and platforms
     const locations: THREE.Vector3[] = [
       new THREE.Vector3(0, 1.8, 0),        // Central Plaza
@@ -159,8 +163,15 @@ export class CollectibleManager {
 
       // Contact Shadow & Cyber Projection Ring directly beneath each collectible on whatever floor/platform/box is below
       const groundY = getTerrainHeight ? getTerrainHeight(pos.x, pos.z, pos.y) : 0.0;
+      const groundNormal = getTerrainNormal ? getTerrainNormal(pos.x, pos.z, pos.y) : new THREE.Vector3(0, 1, 0);
+
       const shadowGroup = new THREE.Group();
-      shadowGroup.position.set(pos.x, groundY + 0.03, pos.z);
+      // Position offset along normal to hug slopes without z-fighting
+      const shadowPos = new THREE.Vector3(pos.x, groundY, pos.z).addScaledVector(groundNormal, 0.035);
+      shadowGroup.position.copy(shadowPos);
+
+      // Align marker and contact shadow rotation exactly with the slope normal vector
+      shadowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), groundNormal);
 
       const shadow = new THREE.Mesh(this.sharedShadowGeo, this.sharedShadowMat);
       shadow.renderOrder = 3;
