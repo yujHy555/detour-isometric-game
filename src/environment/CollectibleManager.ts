@@ -3,7 +3,9 @@ import { AudioManager } from '../engine/AudioManager.ts';
 
 export interface CollectibleItem {
   mesh: THREE.Group;
+  shadowMesh: THREE.Mesh;
   pos: THREE.Vector3;
+  groundY: number;
   isCollected: boolean;
 }
 
@@ -21,12 +23,20 @@ export class CollectibleManager {
   private sharedCrystalMat: THREE.MeshStandardMaterial;
   private sharedRingMat: THREE.MeshBasicMaterial;
 
+  // Shared Contact Shadow (projected directly beneath each collectible onto floor/platform)
+  private sharedShadowGeo: THREE.PlaneGeometry;
+  private sharedShadowMat: THREE.MeshBasicMaterial;
+
   // Pre-allocated collection shockwave VFX (zero runtime allocations)
   private vfxRing: THREE.Mesh;
   private vfxTimer: number = 0;
   private readonly vfxMaxTime: number = 0.28;
 
-  constructor(scene: THREE.Scene, audio?: AudioManager) {
+  constructor(
+    scene: THREE.Scene,
+    audio?: AudioManager,
+    getTerrainHeight?: (x: number, z: number, fromY?: number) => number
+  ) {
     this.scene = scene;
     this.audio = audio || new AudioManager();
     this.uiCounter = document.getElementById('core-count');
@@ -51,6 +61,27 @@ export class CollectibleManager {
       depthWrite: false
     });
 
+    // Create Soft Contact Shadow Texture & Material
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
+    grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.25)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+
+    const shadowTex = new THREE.CanvasTexture(canvas);
+    this.sharedShadowGeo = new THREE.PlaneGeometry(1.2, 1.2);
+    this.sharedShadowGeo.rotateX(-Math.PI / 2);
+    this.sharedShadowMat = new THREE.MeshBasicMaterial({
+      map: shadowTex,
+      transparent: true,
+      depthWrite: false
+    });
+
     // Pre-allocated VFX shockwave ring
     const vfxGeo = new THREE.RingGeometry(0.15, 0.35, 20);
     vfxGeo.rotateX(-Math.PI / 2);
@@ -66,11 +97,11 @@ export class CollectibleManager {
     this.vfxRing.visible = false;
     this.scene.add(this.vfxRing);
 
-    this.spawnAllCores();
+    this.spawnAllCores(getTerrainHeight);
     this.updateHUD();
   }
 
-  private spawnAllCores() {
+  private spawnAllCores(getTerrainHeight?: (x: number, z: number, fromY?: number) => number) {
     // 12 Cyber Energy Cores in fixed, strategic positions across ground, ramps, and platforms
     const locations: THREE.Vector3[] = [
       new THREE.Vector3(0, 1.8, 0),        // Central Plaza
@@ -106,9 +137,22 @@ export class CollectibleManager {
 
       this.scene.add(group);
 
+      // Contact Shadow directly beneath each collectible on whatever floor/platform is below
+      const groundY = getTerrainHeight ? getTerrainHeight(pos.x, pos.z, pos.y) : 0.0;
+      const shadow = new THREE.Mesh(this.sharedShadowGeo, this.sharedShadowMat);
+      shadow.position.set(pos.x, groundY + 0.02, pos.z);
+
+      // Scale shadow based on elevation above ground for rich 3D depth perception
+      const elevation = Math.max(0.1, pos.y - groundY);
+      const shadowScale = THREE.MathUtils.clamp(1.2 - elevation * 0.08, 0.45, 1.1);
+      shadow.scale.set(shadowScale, shadowScale, shadowScale);
+      this.scene.add(shadow);
+
       this.items.push({
         mesh: group,
+        shadowMesh: shadow,
         pos: pos.clone(),
+        groundY,
         isCollected: false
       });
     }
@@ -158,6 +202,7 @@ export class CollectibleManager {
   private collectItem(item: CollectibleItem) {
     item.isCollected = true;
     item.mesh.visible = false;
+    item.shadowMesh.visible = false;
 
     this.collectedCount++;
 

@@ -24,6 +24,7 @@ export class InputManager {
   public jumpJustPressed: boolean = false;
   public jumpBufferTimer: number = 0;
   public actionJustPressed: boolean = false;
+  public cameraToggleRequested: boolean = false;
   public isJetpackHeld: boolean = false;
   public isMobile: boolean = false;
 
@@ -54,8 +55,12 @@ export class InputManager {
   private touchSprintActive: boolean = false;
   private touchJetpackActive: boolean = false;
 
-  // 45° angle offset for isometric camera alignment
-  private readonly isoAngle = -Math.PI / 4;
+  // Direction offset: -45° for Isometric mode, 0° for 3rd Person follow mode
+  private isoAngle: number = -Math.PI / 4;
+
+  public setCameraAngle(angle: number) {
+    this.isoAngle = angle;
+  }
 
   constructor() {
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -109,14 +114,13 @@ export class InputManager {
       this.shiftDown = true;
     }
 
-    // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, V, J, K, Numpad0
+    // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, J, K, Numpad0
     // Left Alt and C reside on separate matrix lines from W+A, completely bypassing hardware keyboard ghosting
     const isJumpKey = (
       e.code === 'Space' ||
       e.code === 'AltLeft' ||
       e.code === 'AltRight' ||
       e.code === 'KeyC' ||
-      e.code === 'KeyV' ||
       e.code === 'KeyJ' ||
       e.code === 'KeyK' ||
       e.code === 'Numpad0'
@@ -126,6 +130,12 @@ export class InputManager {
       e.preventDefault();
       this.jumpJustPressed = true;
       this.jumpBufferTimer = 0.22; // 220ms input buffer
+    }
+
+    // Camera Mode Toggle Key: V
+    if (e.code === 'KeyV') {
+      e.preventDefault();
+      this.cameraToggleRequested = true;
     }
 
     if (e.code === 'KeyE' || e.code === 'KeyF') {
@@ -419,6 +429,14 @@ export class InputManager {
   public consumeAction(): boolean {
     if (this.actionJustPressed) {
       this.actionJustPressed = false;
+      return true;
+    }
+    return false;
+  }
+
+  public consumeCameraToggle(): boolean {
+    if (this.cameraToggleRequested) {
+      this.cameraToggleRequested = false;
       return true;
     }
     return false;

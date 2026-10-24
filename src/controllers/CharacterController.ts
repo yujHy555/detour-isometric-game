@@ -39,17 +39,8 @@ export class CharacterController {
   private tempPos: THREE.Vector3 = new THREE.Vector3();
   private tempQuat: THREE.Quaternion = new THREE.Quaternion();
 
-  // Glowing Digital Blue Hologram Rig (Preload & Fallback Avatar)
-  private leftLeg?: THREE.Mesh;
-  private rightLeg?: THREE.Mesh;
-  private leftArm?: THREE.Mesh;
-  private rightArm?: THREE.Mesh;
-  private headMesh?: THREE.Mesh;
-  private holoBaseRing1?: THREE.Mesh;
-  private holoBaseRing2?: THREE.Mesh;
-  private holoBeam?: THREE.Mesh;
-  private holoBodyMat?: THREE.MeshBasicMaterial;
-  private holoWireMat?: THREE.MeshBasicMaterial;
+  // Simple Lightweight Cyber Preload Device (Ultra-smooth zero stutter)
+  private preloadDroneRing?: THREE.Mesh;
   private animTimer: number = 0;
 
   // Physics constants - tuned to realistic stride & zero foot-sliding
@@ -111,143 +102,41 @@ export class CharacterController {
   }
 
   /**
-   * Glowing Digital Blue Hologram Preload Avatar
-   * Dual-layer translucent cyber mesh with wireframe cage, rotating emitter base rings, and vertical projection beam
+   * Ultra-Lightweight Cyber Preloading Device
+   * Minimalist geometric cyber probe with zero GPU allocation overhead
    */
   private createProceduralRig() {
     this.proceduralRig = new THREE.Group();
 
-    // Digital Hologram Materials
-    this.holoBodyMat = new THREE.MeshBasicMaterial({
-      color: 0x00d4ff,
-      transparent: true,
-      opacity: 0.45,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide
-    });
-
-    this.holoWireMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    const holoBrightMat = new THREE.MeshBasicMaterial({
-      color: 0xbae6fd,
-      transparent: true,
-      opacity: 0.92,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    // Helper to create dual-layer hologram limbs (solid translucent core + additive wireframe overlay)
-    const createHoloPart = (geo: THREE.BufferGeometry): THREE.Group => {
-      const partGroup = new THREE.Group();
-      const core = new THREE.Mesh(geo, this.holoBodyMat);
-      const wire = new THREE.Mesh(geo, this.holoWireMat);
-      wire.scale.set(1.05, 1.05, 1.05);
-      partGroup.add(core, wire);
-      return partGroup;
-    };
-
-    // 1. Torso
-    const torsoGroup = createHoloPart(new THREE.BoxGeometry(0.52, 0.68, 0.32));
-    torsoGroup.position.y = 0.95;
-
-    // Glowing cyber core chest emblem
-    const chestCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), holoBrightMat);
-    chestCore.position.set(0, 0.05, 0.17);
-    torsoGroup.add(chestCore);
-    this.proceduralRig.add(torsoGroup);
-
-    // 2. Head & Optic Visor
-    this.headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), this.holoBodyMat);
-    const headWire = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), this.holoWireMat);
-    headWire.scale.set(1.06, 1.06, 1.06);
-    this.headMesh.add(headWire);
-    this.headMesh.position.y = 1.48;
-
-    // High intensity glowing holographic visor
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.1), holoBrightMat);
-    visor.position.set(0, 0.02, 0.19);
-    this.headMesh.add(visor);
-    this.proceduralRig.add(this.headMesh);
-
-    // 3. Arms
-    const armGeo = new THREE.BoxGeometry(0.13, 0.52, 0.13);
-    this.leftArm = new THREE.Mesh(armGeo, this.holoBodyMat);
-    const leftArmWire = new THREE.Mesh(armGeo, this.holoWireMat);
-    leftArmWire.scale.set(1.06, 1.06, 1.06);
-    this.leftArm.add(leftArmWire);
-    this.leftArm.position.set(-0.36, 0.95, 0);
-
-    this.rightArm = new THREE.Mesh(armGeo, this.holoBodyMat);
-    const rightArmWire = new THREE.Mesh(armGeo, this.holoWireMat);
-    rightArmWire.scale.set(1.06, 1.06, 1.06);
-    this.rightArm.add(rightArmWire);
-    this.rightArm.position.set(0.36, 0.95, 0);
-    this.proceduralRig.add(this.leftArm, this.rightArm);
-
-    // 4. Legs
-    const legGeo = new THREE.BoxGeometry(0.16, 0.62, 0.16);
-    this.leftLeg = new THREE.Mesh(legGeo, this.holoBodyMat);
-    const leftLegWire = new THREE.Mesh(legGeo, this.holoWireMat);
-    leftLegWire.scale.set(1.06, 1.06, 1.06);
-    this.leftLeg.add(leftLegWire);
-    this.leftLeg.position.set(-0.15, 0.34, 0);
-
-    this.rightLeg = new THREE.Mesh(legGeo, this.holoBodyMat);
-    const rightLegWire = new THREE.Mesh(legGeo, this.holoWireMat);
-    rightLegWire.scale.set(1.06, 1.06, 1.06);
-    this.rightLeg.add(rightLegWire);
-    this.rightLeg.position.set(0.15, 0.34, 0);
-    this.proceduralRig.add(this.leftLeg, this.rightLeg);
-
-    // 5. Digital Base Projector Emitter Rings & Light Column at feet
-    const ringMat1 = new THREE.MeshBasicMaterial({
+    const droneMat = new THREE.MeshStandardMaterial({
       color: 0x00f0ff,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.75,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const ringMat2 = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      wireframe: true,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
+      roughness: 0.25,
+      metalness: 0.8,
+      emissive: 0x006688,
+      emissiveIntensity: 0.5
     });
 
-    this.holoBaseRing1 = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.44, 24), ringMat1);
-    this.holoBaseRing1.rotation.x = -Math.PI / 2;
-    this.holoBaseRing1.position.y = 0.03;
+    // Central sleek digital core
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), droneMat);
+    core.position.y = 1.0;
+    this.proceduralRig.add(core);
 
-    this.holoBaseRing2 = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.26, 16), ringMat2);
-    this.holoBaseRing2.rotation.x = -Math.PI / 2;
-    this.holoBaseRing2.position.y = 0.04;
-    this.proceduralRig.add(this.holoBaseRing1, this.holoBaseRing2);
+    // Front sensor visor strip
+    const visor = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.08, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xbae6fd })
+    );
+    visor.position.set(0, 1.02, 0.24);
+    this.proceduralRig.add(visor);
 
-    // Subtle tapered cylindrical hologram projection beam
-    const beamGeo = new THREE.CylinderGeometry(0.48, 0.22, 1.7, 16, 1, true);
-    beamGeo.translate(0, 0.85, 0);
-    const beamMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
-      transparent: true,
-      opacity: 0.12,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    this.holoBeam = new THREE.Mesh(beamGeo, beamMat);
-    this.proceduralRig.add(this.holoBeam);
+    // Single sleek orbiting cyber gyro-ring
+    this.preloadDroneRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.46, 0.022, 6, 20),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    this.preloadDroneRing.position.y = 1.0;
+    this.preloadDroneRing.rotation.x = Math.PI / 3;
+    this.proceduralRig.add(this.preloadDroneRing);
 
     this.group.add(this.proceduralRig);
   }
@@ -934,46 +823,14 @@ export class CharacterController {
     }
   }
 
-  private updateProceduralLimbs(dt: number, isMoving: boolean, isRunning: boolean) {
-    if (!this.leftLeg || !this.rightLeg || !this.leftArm || !this.rightArm) return;
+  private updateProceduralLimbs(dt: number, _isMoving: boolean, _isRunning: boolean) {
+    if (!this.proceduralRig || !this.proceduralRig.visible) return;
 
-    // Rotate digital base hologram emitter rings
-    if (this.holoBaseRing1) this.holoBaseRing1.rotation.z += dt * 1.6;
-    if (this.holoBaseRing2) this.holoBaseRing2.rotation.z -= dt * 2.2;
-
-    // Cyber scanline shimmer & opacity flicker
-    if (this.holoBodyMat) {
-      const flicker = (Math.random() < 0.04 ? 0.12 : 0) + Math.sin(this.animTimer * 14.0) * 0.06;
-      this.holoBodyMat.opacity = THREE.MathUtils.clamp(0.42 + flicker, 0.28, 0.65);
+    // Smooth gentle gyro orbit rotation & hover bob
+    if (this.preloadDroneRing) {
+      this.preloadDroneRing.rotation.z += dt * 2.5;
+      this.preloadDroneRing.rotation.x += dt * 1.5;
     }
-    if (this.holoWireMat) {
-      this.holoWireMat.opacity = 0.82 + Math.sin(this.animTimer * 10.0) * 0.12;
-    }
-    if (this.holoBeam) {
-      (this.holoBeam.material as THREE.MeshBasicMaterial).opacity = 0.10 + Math.sin(this.animTimer * 6.0) * 0.04;
-    }
-
-    if (!this.isGrounded) {
-      // Jump pose
-      this.leftLeg.rotation.x = -0.5;
-      this.rightLeg.rotation.x = 0.4;
-      this.leftArm.rotation.x = 0.8;
-      this.rightArm.rotation.x = -0.8;
-    } else if (isMoving) {
-      const freq = isRunning ? 16.0 : 10.0;
-      const legSwing = Math.sin(this.animTimer * freq) * (isRunning ? 0.8 : 0.5);
-      this.leftLeg.rotation.x = legSwing;
-      this.rightLeg.rotation.x = -legSwing;
-      this.leftArm.rotation.x = -legSwing * 0.9;
-      this.rightArm.rotation.x = legSwing * 0.9;
-    } else {
-      // Idle breath / cyber levitation pulse
-      const breath = Math.sin(this.animTimer * 2.5) * 0.03;
-      this.leftLeg.rotation.x = 0;
-      this.rightLeg.rotation.x = 0;
-      this.leftArm.rotation.x = breath;
-      this.rightArm.rotation.x = -breath;
-      if (this.headMesh) this.headMesh.position.y = 1.48 + breath * 0.5;
-    }
+    this.proceduralRig.position.y = Math.sin(this.animTimer * 3.5) * 0.05;
   }
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { IsometricCamera } from './camera/IsometricCamera.ts';
+import { IsometricCamera, CameraMode } from './camera/IsometricCamera.ts';
 import { InputManager } from './engine/InputManager.ts';
 import { CharacterController } from './controllers/CharacterController.ts';
 import { IsometricWorld } from './environment/IsometricWorld.ts';
@@ -57,7 +57,11 @@ class DetourGame {
     this.inputManager = new InputManager();
     this.world = new IsometricWorld(this.scene);
     this.character = new CharacterController(this.scene);
-    this.collectibles = new CollectibleManager(this.scene);
+    this.collectibles = new CollectibleManager(
+      this.scene,
+      undefined,
+      (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY)
+    );
 
     // Initial character spawn on Central Plaza
     this.character.position.set(0, 1.0, 0);
@@ -82,6 +86,14 @@ class DetourGame {
   }
 
   private setupUIHandlers() {
+    // Camera Mode Toggle Button
+    const camToggleBtn = document.getElementById('btn-toggle-cam');
+    if (camToggleBtn) {
+      camToggleBtn.addEventListener('click', () => {
+        this.toggleCameraMode();
+      });
+    }
+
     // Gamepad HUD Toggle Button
     const toggleBtn = document.getElementById('btn-toggle-gamepad');
     if (toggleBtn && this.gamepadHud) {
@@ -142,6 +154,17 @@ class DetourGame {
     if (this.gpLt) this.gpLt.classList.toggle('active', state.triggerL);
   }
 
+  private toggleCameraMode() {
+    const newMode = this.cameraSystem.toggleMode();
+    const camAngle = newMode === CameraMode.THIRD_PERSON ? 0 : -Math.PI / 4;
+    this.inputManager.setCameraAngle(camAngle);
+
+    const label = document.getElementById('cam-mode-text');
+    if (label) {
+      label.textContent = newMode === CameraMode.THIRD_PERSON ? '3RD PERSON' : 'ISOMETRIC';
+    }
+  }
+
   private onResize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -158,6 +181,10 @@ class DetourGame {
     this.inputManager.update(dt);
     this.inputManager.updateAimTarget(this.cameraSystem.camera, this.character.position.y);
     const jumpPressed = this.inputManager.consumeJump();
+
+    if (this.inputManager.consumeCameraToggle()) {
+      this.toggleCameraMode();
+    }
 
     // 2. Update Sci-Fi Gamepad Telemetry HUD
     this.updateGamepadHUD();

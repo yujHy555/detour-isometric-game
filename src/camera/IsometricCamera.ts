@@ -1,20 +1,35 @@
 import * as THREE from 'three';
 
+export enum CameraMode {
+  ISOMETRIC = 'Isometric',
+  THIRD_PERSON = '3rd Person'
+}
+
 export class IsometricCamera {
   public camera: THREE.PerspectiveCamera;
-  // Diamond Isometric Offset: 45° azimuth, ~35.26° elevation
-  private baseOffset: THREE.Vector3 = new THREE.Vector3(-15, 18, 15);
+  public mode: CameraMode = CameraMode.ISOMETRIC;
+
+  // Offsets and FOVs for each play mode
+  // 1. Isometric: 45° azimuth, elevated diamond angle, low FOV for orthographic-like projection
+  private readonly isoOffset: THREE.Vector3 = new THREE.Vector3(-15, 18, 15);
+  // 2. 3rd Person: Set quite far back and slightly elevated so full body & surroundings are visible
+  private readonly thirdPersonOffset: THREE.Vector3 = new THREE.Vector3(0, 4.5, 12.0);
+
   private currentOffset: THREE.Vector3 = new THREE.Vector3();
+  private targetOffset: THREE.Vector3 = new THREE.Vector3();
   private lookTarget: THREE.Vector3 = new THREE.Vector3();
+
+  private targetFov: number = 28;
+  private targetLookElevation: number = 1.2;
 
   // Screen Shake
   private shakeIntensity: number = 0;
   private shakeDuration: number = 0;
 
   constructor(aspect: number) {
-    // Low FOV (28°) gives clean isometric proportions with subtle 3D depth cues
-    this.camera = new THREE.PerspectiveCamera(28, aspect, 0.1, 300);
-    this.currentOffset.copy(this.baseOffset);
+    this.camera = new THREE.PerspectiveCamera(28, aspect, 0.1, 400);
+    this.targetOffset.copy(this.isoOffset);
+    this.currentOffset.copy(this.isoOffset);
     this.camera.position.copy(this.currentOffset);
   }
 
@@ -23,19 +38,42 @@ export class IsometricCamera {
     this.camera.updateProjectionMatrix();
   }
 
+  public toggleMode(): CameraMode {
+    if (this.mode === CameraMode.ISOMETRIC) {
+      this.mode = CameraMode.THIRD_PERSON;
+      this.targetOffset.copy(this.thirdPersonOffset);
+      this.targetFov = 52;
+      this.targetLookElevation = 1.4;
+    } else {
+      this.mode = CameraMode.ISOMETRIC;
+      this.targetOffset.copy(this.isoOffset);
+      this.targetFov = 28;
+      this.targetLookElevation = 1.2;
+    }
+    return this.mode;
+  }
+
   public triggerShake(intensity: number = 0.25, duration: number = 0.2) {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
     this.shakeDuration = duration;
   }
 
   public update(targetPos: THREE.Vector3, dt: number) {
+    // Smoothly interpolate FOV during camera mode transitions
+    if (Math.abs(this.camera.fov - this.targetFov) > 0.05) {
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, this.targetFov, dt * 6.0);
+      this.camera.updateProjectionMatrix();
+    }
+
+    // Smoothly transition camera offset vector
+    this.currentOffset.lerp(this.targetOffset, dt * 6.0);
     const desiredPos = targetPos.clone().add(this.currentOffset);
 
     // Damped camera follow
     this.camera.position.lerp(desiredPos, dt * 6.0);
 
-    // Look slightly above character origin (chest height)
-    const desiredLook = new THREE.Vector3(targetPos.x, targetPos.y + 1.2, targetPos.z);
+    // Look target (chest / upper body elevation)
+    const desiredLook = new THREE.Vector3(targetPos.x, targetPos.y + this.targetLookElevation, targetPos.z);
     this.lookTarget.lerp(desiredLook, dt * 7.5);
     this.camera.lookAt(this.lookTarget);
 
@@ -52,6 +90,6 @@ export class IsometricCamera {
   }
 
   public setZoom(multiplier: number) {
-    this.currentOffset.copy(this.baseOffset).multiplyScalar(multiplier);
+    this.targetOffset.copy(this.mode === CameraMode.ISOMETRIC ? this.isoOffset : this.thirdPersonOffset).multiplyScalar(multiplier);
   }
 }
