@@ -314,7 +314,7 @@ export class InputManager {
   }
 
   private handleJoystickMove(clientX: number, clientY: number, knob: HTMLElement) {
-    const maxDist = 42;
+    const maxDist = knob.parentElement ? (knob.parentElement.clientWidth / 2 - 10) : 36;
     let dx = clientX - this.touchStartPos.x;
     let dy = clientY - this.touchStartPos.y;
     const dist = Math.hypot(dx, dy);

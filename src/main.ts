@@ -37,6 +37,9 @@ class DetourGame {
   private particleCtx: CanvasRenderingContext2D | null = null;
   private particles: Array<{ x: number; y: number; r: number; speedY: number; speedX: number; color: string; alpha: number; phase: number }> = [];
 
+  // Pre-allocated DOM elements for Radar Blips (Zero runtime allocations / DOM rebuilds)
+  private radarBlipElements: HTMLDivElement[] = [];
+
   // Gamepad HUD Elements
   private gamepadHud: HTMLElement | null;
   private gpStatusBadge: HTMLElement | null;
@@ -58,16 +61,20 @@ class DetourGame {
     this.scene.background = new THREE.Color(0x94a3b8);
     this.scene.fog = new THREE.FogExp2(0x94a3b8, 0.012);
 
-    // High Performance WebGL Renderer
+    // Adaptive High-Performance WebGL Renderer:
+    // Mobile browsers run at max 1.5 pixel ratio with BasicShadowMap for a locked 60 FPS
+    const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && window.innerWidth <= 1024;
+    const maxPixelRatio = isMobileDevice ? 1.5 : 2.0;
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: !isMobileDevice,
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = isMobileDevice ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.25;
 
@@ -99,6 +106,18 @@ class DetourGame {
     this.cockpitFuelFill = document.getElementById('cockpit-fuel-fill');
     this.fuelValLarge = document.getElementById('fuel-val-large');
     this.fuelValSub = document.getElementById('fuel-val-sub');
+
+    // Pre-create 16 pooled radar blip nodes to avoid DOM thrashing on mobile
+    if (this.radarBlipsContainer) {
+      this.radarBlipsContainer.innerHTML = '';
+      for (let i = 0; i < 16; i++) {
+        const blip = document.createElement('div');
+        blip.className = 'radar-blip';
+        blip.style.display = 'none';
+        this.radarBlipsContainer.appendChild(blip);
+        this.radarBlipElements.push(blip);
+      }
+    }
 
     // Cache Gamepad HUD Elements
     this.gamepadHud = document.getElementById('gamepad-hud');
@@ -347,30 +366,37 @@ class DetourGame {
       this.radarPlayerArrow.style.transform = `translate(-50%, -50%) rotate(${headingDeg}deg)`;
     }
 
-    // 4. Update Radar Collectible Blips
-    if (this.radarBlipsContainer) {
+    // 4. Update Radar Collectible Blips (Pooled zero-garbage update)
+    if (this.radarBlipElements.length > 0) {
       const items = this.collectibles.getItems();
-      let blipHtml = '';
       const radarRadius = 55; // pixels from center
       const maxRadarWorldDist = 28; // world coordinate radius
 
-      for (const item of items) {
-        if (item.isCollected) continue;
+      for (let i = 0; i < this.radarBlipElements.length; i++) {
+        const blipEl = this.radarBlipElements[i];
+        if (i >= items.length || items[i].isCollected) {
+          if (blipEl.style.display !== 'none') blipEl.style.display = 'none';
+          continue;
+        }
+
+        const item = items[i];
         const dx = item.pos.x - this.character.position.x;
         const dz = item.pos.z - this.character.position.z;
         const dist = Math.hypot(dx, dz);
 
         if (dist < maxRadarWorldDist) {
-          // Project world coordinates onto 2D radar screen coordinates
           const scale = dist / maxRadarWorldDist;
           const angle = Math.atan2(dz, dx) + Math.PI / 4;
           const blipX = 72 + Math.cos(angle) * (scale * radarRadius);
           const blipY = 72 + Math.sin(angle) * (scale * radarRadius);
 
-          blipHtml += `<div class="radar-blip" style="left: ${blipX.toFixed(1)}px; top: ${blipY.toFixed(1)}px;"></div>`;
+          if (blipEl.style.display !== 'block') blipEl.style.display = 'block';
+          blipEl.style.left = `${blipX.toFixed(1)}px`;
+          blipEl.style.top = `${blipY.toFixed(1)}px`;
+        } else {
+          if (blipEl.style.display !== 'none') blipEl.style.display = 'none';
         }
       }
-      this.radarBlipsContainer.innerHTML = blipHtml;
     }
   }
 
@@ -379,6 +405,11 @@ class DetourGame {
     const height = window.innerHeight;
     this.cameraSystem.onResize(width, height);
     this.renderer.setSize(width, height);
+
+    const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && width <= 1024;
+    const maxPixelRatio = isMobileDevice ? 1.5 : 2.0;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+
     this.resizeParticleCanvas();
   }
 

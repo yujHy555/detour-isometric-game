@@ -28,6 +28,7 @@ export class IsometricWorld {
   // Reusable raycaster for terrain surface probe
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private downVector: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  private rayOrigin: THREE.Vector3 = new THREE.Vector3();
 
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group();
@@ -47,8 +48,10 @@ export class IsometricWorld {
     this.keyLight = new THREE.DirectionalLight(0xfffaed, 1.6);
     this.keyLight.position.set(-20, 36, 20);
     this.keyLight.castShadow = true;
-    this.keyLight.shadow.mapSize.width = 2048;
-    this.keyLight.shadow.mapSize.height = 2048;
+    const isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && window.innerWidth <= 1024;
+    const shadowRes = isMobile ? 1024 : 2048;
+    this.keyLight.shadow.mapSize.width = shadowRes;
+    this.keyLight.shadow.mapSize.height = shadowRes;
     this.keyLight.shadow.camera.near = 0.5;
     this.keyLight.shadow.camera.far = 120;
     const d = 28;
@@ -335,11 +338,12 @@ export class IsometricWorld {
   /**
    * Downward raycast targeting only walkable terrain surfaces.
    * Probes strictly from the character's current elevation down, preventing false hits on elevated sky platforms above.
+   * Zero allocation & zero redundant matrix recalculations for maximum mobile framerate.
    */
   public getTerrainHeight(x: number, z: number, fromY: number = 0.0): number {
-    this.group.updateMatrixWorld(true);
     const startY = fromY + 0.45;
-    this.raycaster.set(new THREE.Vector3(x, startY, z), this.downVector);
+    this.rayOrigin.set(x, startY, z);
+    this.raycaster.set(this.rayOrigin, this.downVector);
     this.raycaster.far = 40.0;
 
     const hits = this.raycaster.intersectObjects(this.terrainColliders, false);
@@ -356,9 +360,9 @@ export class IsometricWorld {
    * Probes surface normal directly beneath coordinate (x, z) to dynamically align contact shadows to ramps and slopes.
    */
   public getTerrainNormal(x: number, z: number, fromY: number = 0.0): THREE.Vector3 {
-    this.group.updateMatrixWorld(true);
     const startY = fromY + 0.45;
-    this.raycaster.set(new THREE.Vector3(x, startY, z), this.downVector);
+    this.rayOrigin.set(x, startY, z);
+    this.raycaster.set(this.rayOrigin, this.downVector);
     this.raycaster.far = 40.0;
 
     const hits = this.raycaster.intersectObjects(this.terrainColliders, false);
