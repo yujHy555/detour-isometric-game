@@ -12,6 +12,64 @@ export enum CharacterState {
   SHOOT = 'shoot'
 }
 
+interface BonePoseTransform {
+  position?: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+}
+
+/**
+ * Exact Frame 1 shooting animation transforms from root|_shooting_01 for all right arm, shoulder, and hand bones.
+ * Natural, untwisted arm straight out in front pointing gun directly forward.
+ */
+const FRAME1_RIGHT_ARM_POSE: Record<string, BonePoseTransform> = {
+  shoulderr: {
+    position: new THREE.Vector3(-5.402413, 10.794614, -4.721297),
+    quaternion: new THREE.Quaternion(-0.426182, 0.706665, 0.520357, 0.219595)
+  },
+  armstretchr: {
+    position: new THREE.Vector3(0, 15.830833, 0),
+    quaternion: new THREE.Quaternion(-0.262154, -0.046496, 0.014971, 0.963789)
+  },
+  armtwistr: {
+    quaternion: new THREE.Quaternion(0, 0, 0, 1)
+  },
+  armtwist2r: {
+    position: new THREE.Vector3(0, 8.597541, 0),
+    quaternion: new THREE.Quaternion(0, 0, 0, 1)
+  },
+  forearmstretchr: {
+    position: new THREE.Vector3(-0.146556, 25.523344, -1.526289),
+    quaternion: new THREE.Quaternion(-0.078154, 0.224284, 0.381030, 0.893535)
+  },
+  forearmtwistr: {
+    position: new THREE.Vector3(0, 14.827166, 0),
+    quaternion: new THREE.Quaternion(0.043334, -0.167861, -0.008974, 0.984817)
+  },
+  forearmtwist2r: {
+    position: new THREE.Vector3(0, 7.413593, 0),
+    quaternion: new THREE.Quaternion(0, -0.167675, 0, 0.985842)
+  },
+  handr: {
+    position: new THREE.Vector3(0, 22.240765, 0),
+    quaternion: new THREE.Quaternion(0.003223, 0.368700, -0.023346, 0.929250)
+  },
+  cindex1r: { quaternion: new THREE.Quaternion(0.002638, -0.019417, 0.040405, 0.998991) },
+  cindex2r: { quaternion: new THREE.Quaternion(-0.005907, 0.001549, -0.000992, 0.999981) },
+  cindex3r: { quaternion: new THREE.Quaternion(-0.416815, 0.065465, -0.055628, 0.904923) },
+  cmiddle1r: { quaternion: new THREE.Quaternion(-0.025078, 0.041425, -0.030792, 0.998352) },
+  cmiddle2r: { quaternion: new THREE.Quaternion(-0.230840, 0.019237, -0.011004, 0.972739) },
+  cmiddle3r: { quaternion: new THREE.Quaternion(-0.161560, -0.015445, -0.008023, 0.986709) },
+  cpinky1r: { quaternion: new THREE.Quaternion(-0.127623, 0.080061, -0.054816, 0.987065) },
+  cpinky2r: { quaternion: new THREE.Quaternion(-0.164659, 0.007792, 0.013010, 0.986234) },
+  cpinky3r: { quaternion: new THREE.Quaternion(-0.103893, -0.022017, 0.004534, 0.994334) },
+  cring1r: { quaternion: new THREE.Quaternion(-0.045176, 0.081771, -0.062394, 0.993670) },
+  cring2r: { quaternion: new THREE.Quaternion(-0.232017, 0.020049, -0.003803, 0.972498) },
+  cring3r: { quaternion: new THREE.Quaternion(-0.134475, -0.016839, -0.006302, 0.990754) },
+  cthumb1r: { quaternion: new THREE.Quaternion(-0.049478, -0.117130, 0.343529, 0.930495) },
+  cthumb2r: { quaternion: new THREE.Quaternion(-0.171287, -0.346215, 0.015682, 0.922253) },
+  cthumb3r: { quaternion: new THREE.Quaternion(-0.066958, -0.020339, -0.028005, 0.997155) }
+};
+
 export class CharacterController {
   public group: THREE.Group;
   public position: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
@@ -41,6 +99,7 @@ export class CharacterController {
   public upperArmBone?: THREE.Bone;
   public forearmBone?: THREE.Bone;
   public handBone?: THREE.Bone;
+  private rightArmBones: Map<string, THREE.Bone> = new Map();
   private shootAnimTimer: number = 0;
   private shootAction?: THREE.AnimationAction;
   private aimStanceWeight: number = 0;
@@ -183,13 +242,17 @@ export class CharacterController {
               console.log('[CharacterController] Identified Gun Emitter empty on character:', child.name);
             }
 
-            // Cache right arm bones for procedural AAA forward aim stance & recoil kick
+            // Cache right arm bones for Frame 1 shooting animation pose
             if ((child as THREE.Bone).isBone) {
-              if (nameLower === 'arm_stretch.r' || nameLower === 'arm_stretchr') {
+              const bKey = child.name.toLowerCase().replace(/[\._\-\s]/g, '');
+              if (this.isRightArmBone(child.name)) {
+                this.rightArmBones.set(bKey, child as THREE.Bone);
+              }
+              if (bKey === 'armstretchr') {
                 this.upperArmBone = child as THREE.Bone;
-              } else if (nameLower === 'forearm_stretch.r' || nameLower === 'forearm_stretchr') {
+              } else if (bKey === 'forearmstretchr') {
                 this.forearmBone = child as THREE.Bone;
-              } else if (nameLower === 'hand.r' || nameLower.includes('hand.r') || nameLower === 'handr') {
+              } else if (bKey === 'handr') {
                 this.handBone = child as THREE.Bone;
               }
             }
@@ -253,6 +316,10 @@ export class CharacterController {
             for (const clip of gltf.animations) {
               const name = clip.name.toLowerCase();
               if (name.includes('shoot')) {
+                // Ensure we only register the primary shooting clip (root|_shooting_01) and not duplicates like .001
+                if (this.shootAction || clip.name.includes('.001')) {
+                  continue;
+                }
                 // Isolate tracks for all right arm, shoulder, and hand bones strictly using Frame 1 (t = 0)
                 const frame1Tracks: THREE.KeyframeTrack[] = [];
                 for (const track of clip.tracks) {
@@ -630,29 +697,20 @@ export class CharacterController {
   }
 
   /**
-   * Poses the right arm straight out in front pointing the gun straight
+   * Applies Frame 1 of shooting animation across all right arm, shoulder, and hand bones.
+   * Completely eliminates arm twist and points gun straight ahead as authored in the animation.
    */
-  public applyStraightArmPose() {
+  public applyShootingArmPose() {
     if (this.aimStanceWeight <= 0.005) return;
 
-    if (this.upperArmBone) {
-      // Extends right arm straight out in front at shoulder height
-      const targetArmQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(-160 * (Math.PI / 180), 0, 98 * (Math.PI / 180))
-      );
-      this.upperArmBone.quaternion.slerp(targetArmQuat, this.aimStanceWeight);
-    }
-    if (this.forearmBone) {
-      const targetForearmQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, 0)
-      );
-      this.forearmBone.quaternion.slerp(targetForearmQuat, this.aimStanceWeight);
-    }
-    if (this.handBone) {
-      const targetHandQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 0, 0)
-      );
-      this.handBone.quaternion.slerp(targetHandQuat, this.aimStanceWeight);
+    for (const [key, bone] of this.rightArmBones.entries()) {
+      const target = FRAME1_RIGHT_ARM_POSE[key];
+      if (target) {
+        bone.quaternion.slerp(target.quaternion, this.aimStanceWeight);
+        if (target.position) {
+          bone.position.lerp(target.position, this.aimStanceWeight);
+        }
+      }
     }
 
     if (this.gunEmitterNode) {
@@ -660,16 +718,20 @@ export class CharacterController {
     }
   }
 
+  public applyStraightArmPose() {
+    this.applyShootingArmPose();
+  }
+
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
     this.aimStanceWeight = 1.0;
-    this.applyStraightArmPose();
+    this.applyShootingArmPose();
 
     const shootAction = this.shootAction || this.findAction('shoot');
     if (shootAction) {
       shootAction.reset();
       shootAction.setEffectiveTimeScale(1.0);
-      shootAction.setEffectiveWeight(50.0);
+      shootAction.setEffectiveWeight(1.0);
       shootAction.play();
     }
     if (this.gunEmitterNode) {
