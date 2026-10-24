@@ -294,11 +294,14 @@ export class CharacterController {
 
   /**
    * Identifies whether a bone belongs to the right arm, hand, or fingers
-   * to allow isolated upper-body shooting layered on top of any movement
+   * to allow isolated upper-body shooting layered on top of any movement.
+   * Handles both sanitized (Three.js PropertyBinding removes dots, e.g. shoulderr, handr)
+   * and raw bone names (shoulder.r, hand.r).
    */
   private isRightArmBone(boneName: string): boolean {
-    const n = boneName.toLowerCase();
-    // Exclude lower body, legs, hips, spine, neck, head, left arm
+    const n = boneName.toLowerCase().replace(/[\._\-\s]/g, '');
+
+    // Exclude lower body, legs, hips, feet, toes, spine, head, left side
     if (
       n.includes('leg') ||
       n.includes('thigh') ||
@@ -310,33 +313,29 @@ export class CharacterController {
       n.includes('root') ||
       n.includes('helmet') ||
       n.includes('backpack') ||
-      n.endsWith('.l') ||
-      n.includes('.l.')
+      n.endsWith('l') // Exclude left arm/hand/fingers (shoulderl, handl, armstretchl, cindex1l, etc.)
     ) {
       return false;
     }
-    // Include right shoulder, arm, forearm, hand, fingers, and weapon
+
+    // Must end with 'r' (right arm / hand / fingers) or contain right arm / weapon identifiers
     return (
-      n.includes('shoulder.r') ||
-      n.includes('arm_stretch.r') ||
-      n.includes('arm_twist.r') ||
-      n.includes('forearm_stretch.r') ||
-      n.includes('forearm_twist.r') ||
-      n.includes('hand.r') ||
-      (n.endsWith('.r') && (
+      (n.endsWith('r') && (
+        n.includes('shoulder') ||
+        n.includes('arm') ||
+        n.includes('forearm') ||
+        n.includes('hand') ||
+        n.includes('wrist') ||
         n.includes('index') ||
         n.includes('middle') ||
         n.includes('pinky') ||
         n.includes('ring') ||
-        n.includes('thumb') ||
-        n.includes('arm') ||
-        n.includes('hand') ||
-        n.includes('wrist')
+        n.includes('thumb')
       )) ||
-      n.includes('atom ray gun') ||
-      n.includes('ray gun') ||
-      n.includes('gun') ||
-      n.includes('pistol')
+      n.includes('raygun') ||
+      n.includes('atom') ||
+      n.includes('pistol') ||
+      n.includes('gun')
     );
   }
 
@@ -578,8 +577,8 @@ export class CharacterController {
     if (shootAction) {
       shootAction.reset();
       shootAction.setEffectiveTimeScale(1.0);
-      shootAction.setEffectiveWeight(25.0);
-      shootAction.fadeIn(0.03).play();
+      shootAction.setEffectiveWeight(50.0);
+      shootAction.play();
     }
   }
 
@@ -926,7 +925,7 @@ export class CharacterController {
     if (this.shootAnimTimer > 0) {
       this.shootAnimTimer -= dt;
       if (this.shootAnimTimer <= 0 && this.shootAction) {
-        this.shootAction.fadeOut(0.08);
+        (this.shootAction as any)._scheduleFading(0.08, this.shootAction.getEffectiveWeight(), 0);
       }
     }
 
