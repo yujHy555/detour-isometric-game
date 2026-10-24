@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
-  <title>DETOUR - 3D Isometric Adventure</title>
+  <title>DETOUR</title>
+  
+  <!-- Official Sci-Fi Fonts matching reference designs -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
   <style>
     * {
       box-sizing: border-box;
@@ -17,10 +23,11 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #080a12;
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background-color: #050811;
+      font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, sans-serif;
       color: #fff;
     }
+
     #game-canvas {
       position: absolute;
       top: 0;
@@ -31,7 +38,723 @@
       z-index: 1;
     }
 
-    /* Orientation Blocker (Enforce Widescreen Landscape on Mobile Browsers) */
+    /* ==========================================================================
+       1. MAIN MENU SCREEN (EXACT MATCH FOR REFERENCE IMAGE 1)
+       ========================================================================== */
+    #main-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: url('/images/main_menu_bg.jpg') center/cover no-repeat;
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s ease;
+      overflow: hidden;
+    }
+    #main-menu.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.04);
+    }
+
+    /* Ambient Subtle Vignette & Bioluminescent Particle Layer */
+    .menu-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(5, 8, 17, 0.05) 0%, rgba(5, 8, 17, 0.55) 100%);
+      pointer-events: none;
+    }
+    #menu-particles {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Sci-Fi HUD Framing Overlay (Corner Brackets & Tech Markings) */
+    .menu-frame {
+      position: absolute;
+      inset: 20px;
+      pointer-events: none;
+      border: 1px solid rgba(56, 189, 248, 0.12);
+    }
+    .frame-corner {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+    }
+    .frame-corner.top-left {
+      top: -1px;
+      left: -1px;
+    }
+    .frame-corner.top-right {
+      top: -1px;
+      right: -1px;
+    }
+    .frame-corner.bottom-left {
+      bottom: -1px;
+      left: -1px;
+    }
+    .frame-corner.bottom-right {
+      bottom: -1px;
+      right: -1px;
+    }
+    .corner-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Tech Markings & Metadata */
+    .build-tag {
+      position: absolute;
+      bottom: 8px;
+      left: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 1.5px;
+      color: rgba(148, 163, 184, 0.7);
+      text-transform: uppercase;
+    }
+    .system-tag {
+      position: absolute;
+      bottom: 8px;
+      right: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 2px;
+      color: rgba(148, 163, 184, 0.65);
+      text-transform: uppercase;
+    }
+    .frame-left-tag {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%) rotate(-90deg);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 3px;
+      color: rgba(56, 189, 248, 0.45);
+      white-space: nowrap;
+    }
+    .grid-cross {
+      position: absolute;
+      color: rgba(56, 189, 248, 0.4);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1;
+    }
+    .grid-cross.top-mid { top: 25%; left: 30%; }
+    .grid-cross.mid-left { top: 60%; left: 18%; }
+    .grid-cross.mid-right { top: 38%; right: 22%; }
+
+    /* Central Brand Logo Container */
+    .menu-content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: -30px;
+    }
+    .menu-logo-wrapper {
+      position: relative;
+      margin-bottom: 34px;
+    }
+
+    /* Official "DETOUR" Logo with Cyan-to-Amber Glow & Laser Flare */
+    .logo-detour {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      font-family: 'Orbitron', 'Rajdhani', sans-serif;
+      font-size: clamp(3.6rem, 7.5vw, 5.8rem);
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      line-height: 1;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    }
+    .logo-det {
+      background: linear-gradient(180deg, #ffffff 15%, #bae6fd 45%, #0284c7 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.9)) drop-shadow(0 0 28px rgba(14, 165, 233, 0.65));
+      -webkit-text-stroke: 1.5px rgba(56, 189, 248, 0.9);
+    }
+    .logo-our {
+      background: linear-gradient(180deg, #ffffff 15%, #fef08a 45%, #d97706 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.9)) drop-shadow(0 0 28px rgba(245, 158, 11, 0.65));
+      -webkit-text-stroke: 1.5px rgba(251, 191, 36, 0.9);
+    }
+    .logo-flare {
+      position: absolute;
+      top: 50%;
+      left: -15%;
+      right: -15%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.4) 20%, #ffffff 50%, rgba(251, 191, 36, 0.4) 80%, transparent 100%);
+      box-shadow: 0 0 10px 1.5px rgba(56, 189, 248, 0.8), 0 0 20px 3px rgba(251, 191, 36, 0.5);
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+
+    /* Menu Buttons Stack (Exact Reference Image 1) */
+    .menu-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      width: 280px;
+    }
+    .menu-btn {
+      width: 100%;
+      height: 46px;
+      background: rgba(10, 20, 36, 0.62);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 4px;
+      color: #94a3b8;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .menu-btn .btn-bracket {
+      opacity: 0;
+      color: #38bdf8;
+      font-size: 1.35rem;
+      font-weight: 400;
+      position: absolute;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .menu-btn .btn-bracket.left { left: 12px; transform: translateX(-4px); }
+    .menu-btn .btn-bracket.right { right: 12px; transform: translateX(4px); }
+
+    .menu-btn:hover, .menu-btn.active {
+      background: rgba(14, 165, 233, 0.18);
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.45), inset 0 0 12px rgba(56, 189, 248, 0.22);
+      transform: translateY(-1px);
+    }
+    .menu-btn:hover .btn-bracket, .menu-btn.active .btn-bracket {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+
+    /* ==========================================================================
+       2. IN-GAME SCI-FI UI HUD (EXACT MATCH FOR REFERENCE IMAGE 2)
+       ========================================================================== */
+    #hud-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 32px;
+    }
+
+    /* Top-Left: Logo & Survey Phase (Image 2) */
+    .hud-top-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      pointer-events: auto;
+    }
+    .hud-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-logo-bracket {
+      width: 10px;
+      height: 22px;
+      border-left: 2px solid #38bdf8;
+      border-top: 2px solid #38bdf8;
+      opacity: 0.85;
+    }
+    .hud-logo-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.15rem;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      color: #38bdf8;
+      text-transform: uppercase;
+      line-height: 1;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 25px rgba(56, 189, 248, 0.4);
+    }
+    .hud-phase-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: #7dd3fc;
+      text-transform: uppercase;
+      padding-left: 4px;
+      margin-top: 2px;
+    }
+    .hud-tech-decor {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding-left: 4px;
+      margin-top: 3px;
+    }
+    .decor-line {
+      height: 1.5px;
+      background: rgba(56, 189, 248, 0.65);
+    }
+    .decor-line.short { width: 14px; }
+    .decor-line.long { width: 32px; }
+    .decor-bar {
+      width: 8px;
+      height: 3px;
+      background: #38bdf8;
+      border-radius: 1px;
+    }
+
+    /* Top-Right: Objective & Atmospheric Badges (Image 2) */
+    .hud-top-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .hud-objective-box {
+      text-align: right;
+    }
+    .objective-header {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 2px;
+      color: #38bdf8;
+      text-transform: uppercase;
+    }
+    .objective-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #ffffff;
+      text-transform: uppercase;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+      margin-top: 1px;
+    }
+    .objective-badges {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 5px;
+    }
+    .badge-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.75rem;
+      color: #bae6fd;
+      backdrop-filter: blur(6px);
+    }
+    .badge-icon {
+      flex-shrink: 0;
+    }
+
+    /* Quick Action Buttons */
+    .hud-quick-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .hud-icon-btn {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+    }
+    .hud-icon-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Center-Screen Targeting Reticle (Image 2) */
+    #hud-reticle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 44px;
+      height: 44px;
+      pointer-events: none;
+    }
+    .reticle-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 3px;
+      height: 3px;
+      background: #38bdf8;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #38bdf8;
+    }
+    .reticle-bracket {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: rgba(56, 189, 248, 0.55);
+      border-style: solid;
+      border-width: 0;
+    }
+    .reticle-bracket.tl { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
+    .reticle-bracket.tr { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; }
+    .reticle-bracket.bl { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+    .reticle-bracket.br { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+    /* Bottom HUD Row: Radar, Curved Cockpit, Inventory */
+    .hud-bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 100%;
+      position: relative;
+    }
+
+    /* Bottom-Left: Circular Holographic Topo Radar & Curved Vital Arcs (Image 2) */
+    .hud-bottom-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .radar-container {
+      position: relative;
+      width: 144px;
+      height: 144px;
+      border-radius: 50%;
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
+    }
+    .radar-bezel-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .radar-sweep {
+      transform-origin: 80px 80px;
+      animation: radarScan 4s linear infinite;
+    }
+    @keyframes radarScan {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    #radar-blips {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .radar-blip {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 8px #00f0ff;
+      transform: translate(-50%, -50%);
+    }
+    #radar-player-arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px #38bdf8);
+      transition: transform 0.1s linear;
+    }
+
+    /* Twin Curved Vital Arcs (Image 2) */
+    .vital-arcs-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 140px;
+    }
+    .vital-arcs-svg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 84px;
+      height: 140px;
+    }
+    .vital-arc-labels {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      padding-left: 20px;
+      z-index: 2;
+    }
+    .arc-label-top {
+      display: flex;
+      gap: 10px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .label-health { color: #f59e0b; }
+    .label-stamina { color: #38bdf8; }
+    .arc-readouts-bottom {
+      display: flex;
+      gap: 12px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.74rem;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+
+    /* Bottom-Center: Curved Cockpit / Thruster HUD (Image 2) */
+    .hud-bottom-center {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+      width: 380px;
+    }
+    .cockpit-gauge-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+    .cockpit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(10, 18, 32, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      border-radius: 6px;
+      padding: 6px 14px;
+      backdrop-filter: blur(8px);
+    }
+    .cockpit-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .health-row .cockpit-label { color: #f59e0b; }
+    .fuel-row .cockpit-label { color: #38bdf8; }
+
+    /* 16 Segmented Amber Health Blocks */
+    .cockpit-blocks-bar {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+      justify-content: center;
+    }
+    .cockpit-blocks-bar .block {
+      width: 10px;
+      height: 12px;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 1px;
+    }
+    .cockpit-blocks-bar .block.active {
+      background: #f59e0b;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+    }
+    .cockpit-number {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fef08a;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* Dynamic Thrust Fuel Bar */
+    .cockpit-fuel-track {
+      flex: 1;
+      height: 10px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .cockpit-fuel-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #0284c7 0%, #38bdf8 65%, #a5f3fc 100%);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.9);
+      transition: width 0.08s linear;
+    }
+    .cockpit-readout-col {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .fuel-val-large {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .fuel-val-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+
+    /* Bottom-Right: INVENTORY QUICK-SLOT (Image 2) */
+    .hud-bottom-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      pointer-events: auto;
+    }
+    .inventory-quickslot-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(10, 18, 32, 0.72);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    }
+    .inventory-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+      padding-bottom: 4px;
+    }
+    .dot-matrix {
+      color: #38bdf8;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+    .inventory-slots-container {
+      display: flex;
+      gap: 10px;
+    }
+    .inv-slot-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .slot-box {
+      position: relative;
+      width: 58px;
+      height: 58px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .slot-box:hover {
+      border-color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+    }
+    .slot-qty {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #f8fafc;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    }
+    .slot-name {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+
+    /* Minimal Floating Controls Tooltip */
+    .controls-hint-bar {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: rgba(148, 163, 184, 0.8);
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .controls-hint-bar kbd {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 3px;
+      padding: 1px 4px;
+      color: #38bdf8;
+    }
+
+    /* ==========================================================================
+       3. RESPONSIVE MOBILE ORIENTATION BLOCKER & CONTROLS
+       ========================================================================== */
     #orientation-blocker {
       display: none;
       position: fixed;
@@ -46,7 +769,6 @@
       align-items: center;
       text-align: center;
       padding: 32px;
-      pointer-events: auto;
     }
     .rotate-device-anim {
       width: 80px;
@@ -58,33 +780,18 @@
       box-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
       animation: rotatePhone 2.2s ease-in-out infinite alternate;
     }
-    .rotate-device-anim::after {
-      content: '';
-      position: absolute;
-      bottom: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 16px;
-      height: 4px;
-      background: #38bdf8;
-      border-radius: 2px;
-    }
     @keyframes rotatePhone {
-      0%, 20% {
-        transform: rotate(0deg);
-      }
-      80%, 100% {
-        transform: rotate(90deg);
-      }
+      0%, 20% { transform: rotate(0deg); }
+      80%, 100% { transform: rotate(90deg); }
     }
     .orientation-title {
+      font-family: 'Orbitron', sans-serif;
       font-size: 1.35rem;
       letter-spacing: 3px;
       text-transform: uppercase;
       color: #38bdf8;
       font-weight: 700;
       margin-bottom: 12px;
-      text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
     }
     .orientation-desc {
       font-size: 0.92rem;
@@ -92,311 +799,9 @@
       max-width: 360px;
       line-height: 1.5;
     }
-
-    /* Trigger orientation blocker on mobile portrait */
     @media screen and (orientation: portrait) and (max-width: 1024px) {
-      #orientation-blocker {
-        display: flex !important;
-      }
-      #hud-overlay, #mobile-controls, #gamepad-hud {
-        display: none !important;
-      }
-    }
-
-    /* Hide gamepad controls and HUD entirely on mobile / touch devices */
-    @media (max-width: 1024px) {
-      #gamepad-hud, #btn-toggle-gamepad {
-        display: none !important;
-      }
-    }
-
-    /* Main HUD */
-    #hud-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 16px 20px;
-    }
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-    }
-    .title-badge {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      border-radius: 8px;
-      padding: 10px 16px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(10px);
-    }
-    .title-badge h1 {
-      font-size: 1.15rem;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: #38bdf8;
-      margin-bottom: 3px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .title-badge .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 10px #10b981;
-      display: inline-block;
-    }
-    .title-badge p {
-      font-size: 0.74rem;
-      color: #94a3b8;
-    }
-    .top-right-panel {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .status-panel {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 0.78rem;
-      color: #94a3b8;
-      backdrop-filter: blur(10px);
-      line-height: 1.4;
-    }
-    .status-panel .status-val {
-      color: #38ef7d;
-      font-weight: 600;
-    }
-    @keyframes corePop {
-      0% { transform: scale(1); filter: brightness(1); }
-      50% { transform: scale(1.35); filter: brightness(1.8) drop-shadow(0 0 10px #00f0ff); color: #fff; }
-      100% { transform: scale(1); filter: brightness(1); }
-    }
-    .pop-anim {
-      display: inline-block;
-      animation: corePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .hud-toggle-btn {
-      pointer-events: auto;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      color: #38bdf8;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(8px);
-      transition: all 0.2s ease;
-    }
-    .hud-toggle-btn:hover {
-      background: rgba(56, 189, 248, 0.2);
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
-    }
-
-    .bottom-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      width: 100%;
-    }
-    .controls-hint {
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 20px;
-      padding: 6px 16px;
-      font-size: 0.76rem;
-      color: #cbd5e1;
-      backdrop-filter: blur(6px);
-    }
-    .controls-hint kbd {
-      background: #1e293b;
-      border: 1px solid #475569;
-      border-radius: 4px;
-      padding: 2px 6px;
-      font-family: inherit;
-      color: #38bdf8;
-      font-size: 0.72rem;
-    }
-
-    /* Sci-Fi Gamepad Holographic Overlay (Seamless Transparent, Non-Windowed) */
-    #gamepad-hud {
-      position: absolute;
-      bottom: 24px;
-      right: 24px;
-      width: 320px;
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      backdrop-filter: none !important;
-      padding: 0;
-      pointer-events: auto;
-      z-index: 15;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-    #gamepad-hud.minimized {
-      transform: translateY(120%);
-      opacity: 0;
-      pointer-events: none;
-    }
-    .gamepad-hud-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      padding-bottom: 4px;
-      border-bottom: none;
-    }
-    .gamepad-hud-title {
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: #38bdf8;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
-    }
-    .gp-status-tag {
-      font-size: 0.72rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      background: rgba(15, 23, 42, 0.75);
-      color: #cbd5e1;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(4px);
-    }
-    .gp-status-tag.active {
-      background: rgba(16, 185, 129, 0.35);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.6);
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
-    }
-
-    /* Controller Vector Graphic */
-    .gp-svg-container {
-      width: 100%;
-      height: 145px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.65));
-    }
-    .gp-svg {
-      width: 100%;
-      height: 100%;
-    }
-    .gp-body {
-      fill: rgba(15, 23, 42, 0.65);
-      stroke: #38bdf8;
-      stroke-width: 2.2;
-    }
-    .gp-stick-base {
-      fill: #0c111f;
-      stroke: #1e293b;
-      stroke-width: 1.5;
-    }
-    .gp-stick-knob {
-      fill: #1e293b;
-      stroke: #38bdf8;
-      stroke-width: 1.5;
-      transition: transform 0.05s ease-out;
-    }
-    .gp-btn {
-      fill: #1a2236;
-      stroke: #475569;
-      stroke-width: 1.5;
-      transition: all 0.1s ease;
-    }
-    .gp-btn-text {
-      font-size: 7px;
-      font-weight: bold;
-      fill: #94a3b8;
-      text-anchor: middle;
-      dominant-baseline: central;
-      pointer-events: none;
-    }
-    .gp-dpad {
-      fill: #1a2236;
-      stroke: #334155;
-      stroke-width: 1;
-    }
-    .gp-trigger {
-      fill: #141b2e;
-      stroke: #38bdf8;
-      stroke-width: 1;
-      opacity: 0.4;
-      transition: opacity 0.1s ease, fill 0.1s ease;
-    }
-
-    /* Reactive Active Glow States */
-    .gp-btn.active-a {
-      fill: #10b981 !important;
-      stroke: #6ee7b7 !important;
-      filter: drop-shadow(0 0 6px #10b981);
-    }
-    .gp-btn.active-b {
-      fill: #ef4444 !important;
-      stroke: #fca5a5 !important;
-      filter: drop-shadow(0 0 6px #ef4444);
-    }
-    .gp-btn.active-x {
-      fill: #3b82f6 !important;
-      stroke: #93c5fd !important;
-      filter: drop-shadow(0 0 6px #3b82f6);
-    }
-    .gp-btn.active-y {
-      fill: #eab308 !important;
-      stroke: #fde047 !important;
-      filter: drop-shadow(0 0 6px #eab308);
-    }
-    .gp-trigger.active {
-      opacity: 1 !important;
-      fill: #38bdf8 !important;
-      filter: drop-shadow(0 0 6px #38bdf8);
-    }
-
-    .gamepad-hud-legend {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px 14px;
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(56, 189, 248, 0.3);
-      font-size: 0.86rem;
-      font-weight: 600;
-      color: #ffffff;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
-    }
-    .gp-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-    }
-    .gp-legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
+      #orientation-blocker { display: flex !important; }
+      #hud-overlay, #mobile-controls, #main-menu { display: none !important; }
     }
 
     /* Mobile Controls (Virtual Joystick & Action Buttons) */
@@ -414,13 +819,13 @@
     .joystick-zone {
       width: 120px;
       height: 120px;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.4) 100%);
-      border: 2px solid rgba(56, 189, 248, 0.35);
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.5) 100%);
+      border: 2px solid rgba(56, 189, 248, 0.4);
       border-radius: 50%;
       position: relative;
       pointer-events: auto;
       touch-action: none;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
     }
     .joystick-knob {
       width: 50px;
@@ -441,10 +846,10 @@
       pointer-events: auto;
     }
     .mobile-btn {
-      width: 62px;
-      height: 62px;
+      width: 60px;
+      height: 60px;
       background: rgba(15, 23, 42, 0.85);
-      border: 2px solid rgba(56, 189, 248, 0.4);
+      border: 2px solid rgba(56, 189, 248, 0.45);
       border-radius: 50%;
       color: #fff;
       font-weight: 700;
@@ -458,42 +863,25 @@
       touch-action: none;
       backdrop-filter: blur(8px);
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-      transition: all 0.15s ease;
     }
     .mobile-btn span.sub {
-      font-size: 0.58rem;
+      font-size: 0.55rem;
       color: #94a3b8;
-      font-weight: normal;
-      margin-top: 1px;
     }
     .mobile-btn:active, .mobile-btn.pressed {
       background: rgba(56, 189, 248, 0.4);
-      border-color: #38bdf8;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
       transform: scale(0.94);
     }
     #btn-touch-sprint.active {
       background: rgba(245, 158, 11, 0.4);
       border-color: #f59e0b;
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
       color: #fef3c7;
-    }
-    #btn-touch-jetpack {
-      border-color: rgba(56, 189, 248, 0.6);
     }
     #btn-touch-jetpack.active, #btn-touch-jetpack:active {
       background: rgba(14, 165, 233, 0.45);
       border-color: #38bdf8;
       box-shadow: 0 0 20px rgba(56, 189, 248, 0.8);
       transform: scale(0.94);
-    }
-    #btn-touch-jump {
-      border-color: rgba(52, 211, 153, 0.5);
-    }
-    #btn-touch-jump:active {
-      background: rgba(52, 211, 153, 0.4);
-      border-color: #34d399;
-      box-shadow: 0 0 20px rgba(52, 211, 153, 0.6);
     }
   </style>
 </head>
@@ -503,147 +891,340 @@
     <div class="rotate-device-anim"></div>
     <div class="orientation-title">Widescreen Required</div>
     <div class="orientation-desc">
-      DETOUR is optimized for widescreen isometric exploration. Please rotate your mobile device to <strong>Landscape</strong> orientation to play.
+      DETOUR is optimized for widescreen exploration. Please rotate your mobile device to <strong>Landscape</strong> orientation to play.
     </div>
   </div>
 
   <canvas id="game-canvas"></canvas>
 
-  <!-- Desktop & Tablet HUD -->
-  <div id="hud-overlay">
-    <div class="top-bar">
-      <div class="title-badge">
-        <h1><span class="status-dot"></span> DETOUR 3D</h1>
-        <p>Tactical Isometric Character Engine</p>
+  <!-- ==========================================================================
+       1. MAIN MENU SCREEN (EXACT MATCH FOR REFERENCE IMAGE 1)
+       ========================================================================== -->
+  <div id="main-menu">
+    <div class="menu-vignette"></div>
+    <canvas id="menu-particles"></canvas>
+
+    <!-- Sci-Fi HUD Framing Lines & Corner Tech Details (Image 1) -->
+    <div class="menu-frame">
+      <!-- Top-Left Corner -->
+      <div class="frame-corner top-left">
+        <svg class="corner-svg" viewBox="0 0 100 100">
+          <path d="M 2 40 L 2 6 L 6 2 L 60 2" fill="none" stroke="#38bdf8" stroke-width="1.8" opacity="0.85"/>
+          <line x1="6" y1="12" x2="6" y2="24" stroke="#38bdf8" stroke-width="2" opacity="0.9"/>
+          <line x1="12" y1="12" x2="12" y2="24" stroke="#38bdf8" stroke-width="2" opacity="0.9"/>
+          <line x1="20" y1="2" x2="35" y2="2" stroke="#ffffff" stroke-width="2"/>
+        </svg>
       </div>
 
-      <div class="top-right-panel">
-        <div class="status-panel">
-          <div>Rig: <span id="rig-status" class="status-val">Loading Character...</span></div>
-          <div>Energy Cores: <span id="core-count" class="status-val" style="color: #00f0ff;">0 / 12</span></div>
-          <div>Audio: <span class="status-val">Active (Procedural)</span></div>
+      <!-- Top-Right Corner -->
+      <div class="frame-corner top-right">
+        <svg class="corner-svg" viewBox="0 0 100 100">
+          <path d="M 98 40 L 98 6 L 94 2 L 40 2" fill="none" stroke="#38bdf8" stroke-width="1.8" opacity="0.85"/>
+          <line x1="94" y1="12" x2="94" y2="24" stroke="#38bdf8" stroke-width="2" opacity="0.9"/>
+          <line x1="65" y1="2" x2="80" y2="2" stroke="#ffffff" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- Bottom-Left Corner with BUILD v1.0.4 -->
+      <div class="frame-corner bottom-left">
+        <svg class="corner-svg" viewBox="0 0 100 100">
+          <path d="M 2 60 L 2 94 L 6 98 L 60 98" fill="none" stroke="#38bdf8" stroke-width="1.8" opacity="0.85"/>
+          <line x1="6" y1="76" x2="6" y2="88" stroke="#38bdf8" stroke-width="2" opacity="0.9"/>
+        </svg>
+        <div class="build-tag">BUILD v1.0.4</div>
+      </div>
+
+      <!-- Bottom-Right Corner with OVERLOAD // SYSTEM VER 08 -->
+      <div class="frame-corner bottom-right">
+        <svg class="corner-svg" viewBox="0 0 100 100">
+          <path d="M 98 60 L 98 94 L 94 98 L 40 98" fill="none" stroke="#38bdf8" stroke-width="1.8" opacity="0.85"/>
+          <line x1="94" y1="76" x2="94" y2="88" stroke="#38bdf8" stroke-width="2" opacity="0.9"/>
+        </svg>
+        <div class="system-tag">O V E R L O A D // SYSTEM VER 08</div>
+      </div>
+
+      <!-- Left Edge Tech Text: DIGITA 01 BALT 20 -->
+      <div class="frame-left-tag">DIGITA 01 BALT 20</div>
+
+      <!-- Grid Crosses -->
+      <div class="grid-cross top-mid">+</div>
+      <div class="grid-cross mid-left">+</div>
+      <div class="grid-cross mid-right">+</div>
+    </div>
+
+    <!-- Center Content: Logo & Nav Buttons -->
+    <div class="menu-content">
+      <!-- Official "DETOUR" Logo with Cyan-to-Amber Glow & Laser Flare -->
+      <div class="menu-logo-wrapper">
+        <div class="logo-detour">
+          <span class="logo-det">DET</span><span class="logo-our">OUR</span>
+          <div class="logo-flare"></div>
         </div>
-        <button id="btn-toggle-cam" class="hud-toggle-btn" title="Toggle Camera Perspective (V key)">
-          <span>🎥</span> <span id="cam-mode-text">ISOMETRIC</span>
-        </button>
-        <button id="btn-toggle-gamepad" class="hud-toggle-btn" title="Toggle Gamepad Schematic">
-          <span>🎮</span> GAMEPAD HUD
-        </button>
       </div>
-    </div>
 
-    <div class="bottom-bar">
-      <div class="controls-hint">
-        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Move &bull; 
-        <kbd>Shift</kbd> Sprint &bull; 
-        <kbd>Space</kbd> / <kbd>Z</kbd> / <kbd>Ctrl</kbd> Triple Jump &bull; 
-        <kbd>B</kbd> Jetpack Fly (Hold) &bull; 
-        <kbd>V</kbd> Camera Mode &bull; 
-        <kbd>Right-Click</kbd> Aim
+      <!-- Menu Buttons List -->
+      <div class="menu-nav">
+        <button class="menu-btn active" id="btn-menu-start">
+          <span class="btn-bracket left">[</span>
+          <span class="btn-text">START GAME</span>
+          <span class="btn-bracket right">]</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-load">
+          <span class="btn-bracket left">[</span>
+          <span class="btn-text">LOAD SAVE</span>
+          <span class="btn-bracket right">]</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-settings">
+          <span class="btn-bracket left">[</span>
+          <span class="btn-text">SETTINGS</span>
+          <span class="btn-bracket right">]</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-quit">
+          <span class="btn-bracket left">[</span>
+          <span class="btn-text">QUIT</span>
+          <span class="btn-bracket right">]</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Sci-Fi Gamepad Telemetry Graphic HUD -->
-  <div id="gamepad-hud">
-    <div class="gamepad-hud-header">
-      <div class="gamepad-hud-title">
-        <span>🎮</span> GAMEPAD SCHEMATIC
+
+  <!-- ==========================================================================
+       2. IN-GAME SCI-FI UI HUD (EXACT MATCH FOR REFERENCE IMAGE 2)
+       ========================================================================== -->
+  <div id="hud-overlay">
+    <!-- Top Row: Top-Left Branding & Top-Right Objective -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+      <!-- Top-Left: Logo & Survey Phase (Image 2) -->
+      <div class="hud-top-left">
+        <div class="hud-logo-row">
+          <div class="hud-logo-bracket"></div>
+          <div class="hud-logo-text">DETOUR</div>
+        </div>
+        <div class="hud-phase-label">SURVEY PHASE // V-0.89</div>
+        <div class="hud-tech-decor">
+          <span class="decor-line short"></span>
+          <span class="decor-bar"></span>
+          <span class="decor-bar"></span>
+          <span class="decor-line long"></span>
+        </div>
       </div>
-      <div id="gp-status-badge" class="gp-status-tag">STANDBY</div>
+
+      <!-- Top-Right: Objective & Atmospheric Badges (Image 2) -->
+      <div class="hud-top-right">
+        <div class="hud-objective-box">
+          <div class="objective-header">OBJECTIVE:</div>
+          <div class="objective-title">REACH THE RIDGE (<span id="obj-dist-val">420</span>m)</div>
+          <div class="objective-badges">
+            <div class="badge-item ridge-badge">
+              <svg class="badge-icon" viewBox="0 0 20 20" width="16" height="16">
+                <polygon points="10,2 18,17 2,17" fill="none" stroke="#38bdf8" stroke-width="1.8"/>
+                <polyline points="7,12 10,8 13,12" stroke="#38bdf8" stroke-width="1.4" fill="none"/>
+              </svg>
+              <span id="badge-dist">420m</span>
+            </div>
+            <div class="badge-item weather-badge" title="Atmosphere Condition: Clear High Altitude">
+              <svg class="badge-icon" viewBox="0 0 20 20" width="16" height="16">
+                <circle cx="10" cy="8" r="3.5" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+                <path d="M 4 14 Q 7 11 11 11 Q 14 11 15 13 Q 17 13 17 15" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-quick-actions">
+          <button id="btn-toggle-cam" class="hud-icon-btn" title="Toggle Camera Perspective (V key)">
+            <span>🎥</span> <span id="cam-mode-text">ISOMETRIC</span>
+          </button>
+          <button id="btn-open-menu" class="hud-icon-btn" title="Open Main Menu (ESC)">
+            <span>⚙️</span> MENU
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="gp-svg-container">
-      <svg class="gp-svg" viewBox="0 0 240 120" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stop-color="#1e293b"/>
-            <stop offset="100%" stop-color="#0b0f19"/>
-          </radialGradient>
-        </defs>
-
-        <!-- Triggers / Bumpers -->
-        <rect id="gp-lt" class="gp-trigger" x="42" y="10" width="34" height="12" rx="4"/>
-        <rect id="gp-rt" class="gp-trigger" x="164" y="10" width="34" height="12" rx="4"/>
-
-        <!-- Controller Body Shell -->
-        <path class="gp-body" d="
-          M 60 22 
-          Q 120 28 180 22 
-          Q 215 22 225 60 
-          Q 235 100 205 112 
-          Q 180 118 165 92 
-          Q 120 102 75 92 
-          Q 60 118 35 112 
-          Q 5 100 15 60 
-          Q 25 22 60 22 Z
-        "/>
-
-        <!-- D-Pad (Left) -->
-        <g id="gp-dpad" transform="translate(68, 68)">
-          <path class="gp-dpad" d="M -6 -18 h 12 v 12 h 12 v 12 h -12 v 12 h -12 v -12 h -12 v -12 h 12 Z"/>
-        </g>
-
-        <!-- Left Analog Stick (Isometric Movement) -->
-        <g id="gp-stick-left-group" transform="translate(94, 46)">
-          <circle class="gp-stick-base" cx="0" cy="0" r="16"/>
-          <circle id="gp-stick-l-knob" class="gp-stick-knob" cx="0" cy="0" r="10"/>
-        </g>
-
-        <!-- Right Analog Stick (Aiming) -->
-        <g id="gp-stick-right-group" transform="translate(144, 72)">
-          <circle class="gp-stick-base" cx="0" cy="0" r="16"/>
-          <circle id="gp-stick-r-knob" class="gp-stick-knob" cx="0" cy="0" r="10"/>
-        </g>
-
-        <!-- Face Action Buttons (ABXY) -->
-        <!-- Y (Top) -->
-        <circle id="gp-btn-y" class="gp-btn" cx="178" cy="40" r="6.5"/>
-        <text class="gp-btn-text" x="178" y="40">Y</text>
-
-        <!-- X (Left - Action) -->
-        <circle id="gp-btn-x" class="gp-btn" cx="163" cy="52" r="6.5"/>
-        <text class="gp-btn-text" x="163" y="52">X</text>
-
-        <!-- B (Right - Sprint) -->
-        <circle id="gp-btn-b" class="gp-btn" cx="193" cy="52" r="6.5"/>
-        <text class="gp-btn-text" x="193" y="52">B</text>
-
-        <!-- A (Bottom - Jump / Double Jump) -->
-        <circle id="gp-btn-a" class="gp-btn" cx="178" cy="64" r="6.5"/>
-        <text class="gp-btn-text" x="178" y="64">A</text>
-      </svg>
+    <!-- Center-Screen Targeting Reticle (Image 2) -->
+    <div id="hud-reticle">
+      <div class="reticle-dot"></div>
+      <div class="reticle-bracket tl"></div>
+      <div class="reticle-bracket tr"></div>
+      <div class="reticle-bracket bl"></div>
+      <div class="reticle-bracket br"></div>
     </div>
 
-    <div class="gamepad-hud-legend">
-      <div class="gp-legend-item">
-        <span class="gp-legend-dot" style="background:#10b981;"></span>
-        <span><strong>A:</strong> Jump / 2X</span>
+    <!-- Bottom Row: Radar, Curved Cockpit, Inventory -->
+    <div class="hud-bottom-row">
+      <!-- Bottom-Left: Circular Holographic Topo Radar & Curved Vital Arcs (Image 2) -->
+      <div class="hud-bottom-left">
+        <!-- Circular Holographic Radar -->
+        <div class="radar-container">
+          <svg class="radar-bezel-svg" viewBox="0 0 160 160" width="144" height="144">
+            <!-- Outer Glowing Ring -->
+            <circle cx="80" cy="80" r="70" fill="rgba(8, 20, 35, 0.55)" stroke="#38bdf8" stroke-width="1.5" opacity="0.85"/>
+            <circle cx="80" cy="80" r="66" fill="none" stroke="#0284c7" stroke-width="0.8" opacity="0.4" stroke-dasharray="3, 3"/>
+            
+            <!-- Cardinal Marks & Ticks -->
+            <line x1="80" y1="8" x2="80" y2="16" stroke="#38bdf8" stroke-width="2"/>
+            <line x1="80" y1="144" x2="80" y2="152" stroke="#38bdf8" stroke-width="2"/>
+            <line x1="8" y1="80" x2="16" y2="80" stroke="#38bdf8" stroke-width="2"/>
+            <line x1="144" y1="80" x2="152" y2="80" stroke="#38bdf8" stroke-width="2"/>
+            
+            <circle cx="80" cy="80" r="45" fill="none" stroke="#38bdf8" stroke-width="0.8" opacity="0.3"/>
+            <circle cx="80" cy="80" r="22" fill="none" stroke="#38bdf8" stroke-width="0.8" opacity="0.25"/>
+
+            <!-- Topographic Contour Lines -->
+            <path d="M 38 60 Q 60 45 85 52 Q 110 58 122 75 Q 115 105 85 110 Q 55 112 42 90 Z" fill="none" stroke="#38bdf8" stroke-width="1" opacity="0.38"/>
+            <path d="M 48 70 Q 65 60 82 64 Q 100 68 108 80 Q 102 98 82 100 Q 62 102 52 86 Z" fill="none" stroke="#38bdf8" stroke-width="1.2" opacity="0.5"/>
+            <path d="M 58 76 Q 72 70 82 74 Q 92 78 95 86 Q 90 94 80 94 Q 68 94 62 85 Z" fill="none" stroke="#38bdf8" stroke-width="1.4" opacity="0.65"/>
+            
+            <!-- Scanning Line -->
+            <line x1="80" y1="80" x2="130" y2="30" stroke="rgba(56, 189, 248, 0.45)" stroke-width="1.5" class="radar-sweep"/>
+          </svg>
+
+          <!-- Dynamic Blip Layer for Collectibles & Landmarks -->
+          <div id="radar-blips"></div>
+
+          <!-- Dynamic Center Player Indicator Arrow (Rotates with character heading) -->
+          <div id="radar-player-arrow">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <polygon points="12,2 20,20 12,16 4,20" fill="#38bdf8" stroke="#bae6fd" stroke-width="1"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Twin Curved Vital Arcs to Right of Radar (Image 2) -->
+        <div class="vital-arcs-container">
+          <svg class="vital-arcs-svg" viewBox="0 0 90 150">
+            <!-- Inner Amber Health Arc -->
+            <path d="M 28 20 A 70 70 0 0 1 28 126" fill="none" stroke="rgba(245, 158, 11, 0.25)" stroke-width="5" stroke-linecap="round"/>
+            <path id="health-arc-fill" d="M 28 20 A 70 70 0 0 1 28 126" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round" stroke-dasharray="140" stroke-dashoffset="25"/>
+
+            <!-- Outer Cyan Stamina Arc -->
+            <path d="M 48 12 A 86 86 0 0 1 48 134" fill="none" stroke="rgba(56, 189, 248, 0.25)" stroke-width="5" stroke-linecap="round"/>
+            <path id="stamina-arc-fill" d="M 48 12 A 86 86 0 0 1 48 134" fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-dasharray="160" stroke-dashoffset="15"/>
+          </svg>
+          <div class="vital-arc-labels">
+            <div class="arc-label-top">
+              <span class="label-health">HEALTH</span>
+              <span class="label-stamina">STAMINA</span>
+            </div>
+            <div class="arc-readouts-bottom">
+              <span class="val-health">19:00</span>
+              <span class="val-stamina">20:00</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="gp-legend-item">
-        <span class="gp-legend-dot" style="background:#ef4444;"></span>
-        <span><strong>B / RT:</strong> Sprint</span>
+
+      <!-- Bottom-Center: Curved Cockpit / Thruster HUD (Image 2) -->
+      <div class="hud-bottom-center">
+        <div class="cockpit-gauge-container">
+          <!-- Upper Curve: HEALTH Segmented Blocks -->
+          <div class="cockpit-row health-row">
+            <div class="cockpit-label">HEALTH</div>
+            <div class="cockpit-blocks-bar" id="cockpit-health-blocks">
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block active"></span>
+              <span class="block active"></span><span class="block"></span>
+            </div>
+            <div class="cockpit-number" id="cockpit-health-num">51.5</div>
+          </div>
+
+          <!-- Lower Curve: THRUST FUEL Dynamic Jetpack Arc -->
+          <div class="cockpit-row fuel-row">
+            <div class="cockpit-label">THRUST FUEL</div>
+            <div class="cockpit-fuel-track">
+              <div class="cockpit-fuel-bar" id="cockpit-fuel-fill"></div>
+            </div>
+            <div class="cockpit-readout-col">
+              <div class="fuel-val-large" id="fuel-val-large">3.42</div>
+              <div class="fuel-val-sub"><span id="fuel-val-sub">800</span> / 800</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls-hint-bar">
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &bull; 
+          <kbd>Space</kbd> / <kbd>Z</kbd> Triple Jump &bull; 
+          <kbd>B</kbd> Jetpack Fly &bull; 
+          <kbd>V</kbd> Camera &bull; 
+          <kbd>ESC</kbd> Menu
+        </div>
       </div>
-      <div class="gp-legend-item">
-        <span class="gp-legend-dot" style="background:#eab308;"></span>
-        <span><strong>Y / LB:</strong> Jetpack Fly</span>
-      </div>
-      <div class="gp-legend-item">
-        <span class="gp-legend-dot" style="background:#3b82f6;"></span>
-        <span><strong>X:</strong> Action</span>
-      </div>
-      <div class="gp-legend-item">
-        <span class="gp-legend-dot" style="background:#38bdf8;"></span>
-        <span><strong>L-Stick:</strong> Move (Iso)</span>
-      </div>
-      <div class="gp-legend-item">
-        <span class="gp-legend-dot" style="background:#60a5fa;"></span>
-        <span><strong>R-Stick:</strong> Aim</span>
+
+      <!-- Bottom-Right: INVENTORY QUICK-SLOT (Image 2) -->
+      <div class="hud-bottom-right">
+        <div class="inventory-quickslot-wrapper">
+          <div class="inventory-header">
+            <span>INVENTORY QUICK-SLOT</span>
+            <span class="dot-matrix">::::::</span>
+          </div>
+
+          <div class="inventory-slots-container">
+            <!-- Slot 1: SPORE POD -->
+            <div class="inv-slot-item">
+              <div class="slot-box">
+                <div class="slot-icon spore-pod-icon">
+                  <svg viewBox="0 0 40 40" width="34" height="34">
+                    <defs>
+                      <radialGradient id="sporeGrad" cx="50%" cy="40%" r="50%">
+                        <stop offset="0%" stop-color="#a5f3fc"/>
+                        <stop offset="60%" stop-color="#06b6d4"/>
+                        <stop offset="100%" stop-color="#0e7490"/>
+                      </radialGradient>
+                    </defs>
+                    <path d="M 20 6 C 13 13 11 23 18 32 C 20 34 20 34 22 32 C 29 23 27 13 20 6 Z" fill="url(#sporeGrad)"/>
+                    <circle cx="17" cy="18" r="1.5" fill="#fff"/>
+                    <circle cx="23" cy="22" r="1" fill="#fff"/>
+                  </svg>
+                </div>
+                <div class="slot-qty">8x</div>
+              </div>
+              <div class="slot-name">SPORE POD</div>
+            </div>
+
+            <!-- Slot 2: FIBER -->
+            <div class="inv-slot-item">
+              <div class="slot-box">
+                <div class="slot-icon fiber-icon">
+                  <svg viewBox="0 0 40 40" width="34" height="34">
+                    <path d="M 8 32 C 14 26 22 18 32 8" stroke="#fef08a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                    <path d="M 12 34 C 18 28 26 20 34 14" stroke="#eab308" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+                    <path d="M 6 28 C 14 22 24 16 30 12" stroke="#ca8a04" stroke-width="2" fill="none" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <div class="slot-qty">3x</div>
+              </div>
+              <div class="slot-name">FIBER</div>
+            </div>
+
+            <!-- Slot 3: FLORA S.1 (Dynamically tracks energy cores) -->
+            <div class="inv-slot-item">
+              <div class="slot-box">
+                <div class="slot-icon flora-icon">
+                  <svg viewBox="0 0 40 40" width="34" height="34">
+                    <path d="M 20 34 Q 22 24 20 18 Q 18 12 20 8" stroke="#10b981" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                    <circle cx="20" cy="8" r="4.5" fill="#f43f5e"/>
+                    <circle cx="14" cy="14" r="3" fill="#a855f7"/>
+                    <circle cx="26" cy="14" r="3" fill="#06b6d4"/>
+                  </svg>
+                </div>
+                <div class="slot-qty" id="slot-core-qty">0 / 12</div>
+              </div>
+              <div class="slot-name">FLORA S.1</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Mobile Controls (Landscape Virtual Sticks & Buttons) -->
+  <!-- Mobile Controls (Virtual Sticks & Buttons) -->
   <div id="mobile-controls">
     <div class="joystick-zone" id="touch-joystick">
       <div class="joystick-knob" id="joystick-knob"></div>

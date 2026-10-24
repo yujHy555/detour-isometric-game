@@ -364,4 +364,56 @@ export class AudioManager {
     subOsc.start(t);
     subOsc.stop(t + 0.11);
   }
+
+  /**
+   * Crisp futuristic sci-fi UI hover / select click
+   */
+  public playMenuClick() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.exponentialRampToValueAtTime(1800, t + 0.04);
+
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.06);
+  }
+
+  /**
+   * Resonant sci-fi game start / boot activation chime
+   */
+  public playGameStart() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+    const freqs = [440, 660, 880, 1320];
+
+    freqs.forEach((f, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, t + idx * 0.06);
+      osc.frequency.exponentialRampToValueAtTime(f * 1.5, t + idx * 0.06 + 0.35);
+
+      gain.gain.setValueAtTime(0.18, t + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + idx * 0.06 + 0.6);
+
+      osc.connect(gain);
+      gain.connect(this.ctx!.destination);
+      osc.start(t + idx * 0.06);
+      osc.stop(t + idx * 0.06 + 0.65);
+    });
+  }
 }

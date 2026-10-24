@@ -264,12 +264,24 @@ export class CollectibleManager {
     this.updateHUD();
   }
 
+  public getItems() {
+    return this.items;
+  }
+
+  public getCollectedCount(): number {
+    return this.collectedCount;
+  }
+
   private updateHUD() {
     if (!this.uiCounter) {
       this.uiCounter = document.getElementById('core-count');
     }
     if (this.uiCounter) {
       this.uiCounter.textContent = `${this.collectedCount} / ${this.totalCount}`;
+    }
+    const slotCounter = document.getElementById('slot-core-qty');
+    if (slotCounter) {
+      slotCounter.textContent = `${this.collectedCount} / ${this.totalCount}`;
     }
   }
 }
