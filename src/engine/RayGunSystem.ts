@@ -83,6 +83,17 @@ export class RayGunSystem {
   private activeExplosionParticles: ExplosionParticle[] = [];
   private activeExplosionLights: ExplosionLight[] = [];
 
+  // Laser Sight Guide & Aim Assistance
+  private laserGuideGroup!: THREE.Group;
+  private laserLineMesh!: THREE.Mesh;
+  private laserDotMesh!: THREE.Mesh;
+  private laserLockRing!: THREE.Mesh;
+  private laserLineMat!: THREE.MeshBasicMaterial;
+  private laserDotMat!: THREE.MeshBasicMaterial;
+  private laserRingMat!: THREE.MeshBasicMaterial;
+  private isTargetLocked: boolean = false;
+  private camera?: THREE.Camera;
+
   // Firing mechanics
   private cooldown: number = 0;
   private readonly fireRate: number = 0.35; // Matches duration of shoot animation
@@ -115,13 +126,15 @@ export class RayGunSystem {
     audio: AudioManager,
     character: CharacterController,
     world: IsometricWorld,
-    plants: PlantManager
+    plants: PlantManager,
+    camera?: THREE.Camera
   ) {
     this.scene = scene;
     this.audio = audio;
     this.character = character;
     this.world = world;
     this.plants = plants;
+    this.camera = camera;
 
     // Pre-allocate shared VFX assets
     this.sparkGeo = new THREE.SphereGeometry(0.032, 6, 6);
@@ -203,6 +216,7 @@ export class RayGunSystem {
 
     this.spawnWorldCollectible();
     this.createTestTargets();
+    this.setupLaserGuide();
   }
 
   /**
@@ -496,6 +510,9 @@ export class RayGunSystem {
         fl.light.intensity = progress * 9.0;
       }
     }
+
+    // 10. Update Faint Laser Sight Guide & Target Lock
+    this.updateLaserGuide(dt);
   }
 
   /**
@@ -537,20 +554,23 @@ export class RayGunSystem {
     this.character.group.updateMatrixWorld(true);
 
     // 2. Obtain exact physical barrel muzzle position and 3D barrel direction from empty_gun_emitter
-    // (Accurately follows character orientation and full 3D pitch/bank tilt during flight)
-    const { position: muzzlePos, direction: aimDir } = this.character.getMuzzlePositionAndDirection();
+    const { position: muzzlePos, direction: rawDir } = this.character.getMuzzlePositionAndDirection();
 
-    // 3. Physical recoil impulse pushes character slightly backward opposite to aim direction
+    // 3. Evaluate Soft Aim Magnetism & Generous Hit Radius
+    const magnetized = this.findBestMagnetizedTarget(muzzlePos, rawDir);
+    const aimDir = magnetized ? magnetized.direction : rawDir;
+
+    // 4. Physical recoil impulse pushes character slightly backward opposite to aim direction
     this.character.velocity.addScaledVector(aimDir, -0.65);
 
-    // 4. Audio Firing Sound
+    // 5. Audio Firing Sound
     try {
       this.audio.playRayGunShot();
     } catch {
       // Audio fallback
     }
 
-    // 5. Ray shoots straight from the barrel empty at the exact 3D barrel angle
+    // 6. Ray shoots straight from the barrel empty with aim assistance
     this.raycaster.set(muzzlePos, aimDir);
     this.raycaster.far = 60.0;
 
@@ -561,9 +581,13 @@ export class RayGunSystem {
     let hitPoint: THREE.Vector3;
     let hitNormal: THREE.Vector3;
     let didHit = false;
-    let hitTarget: TargetSphere | undefined;
+    let hitTarget: TargetSphere | undefined = magnetized ? magnetized.target : undefined;
 
-    if (hits.length > 0) {
+    if (magnetized) {
+      hitPoint = magnetized.target.mesh.position.clone();
+      hitNormal = aimDir.clone().negate();
+      didHit = true;
+    } else if (hits.length > 0) {
       const hit = hits[0];
       hitPoint = hit.point;
       hitNormal = hit.face ? hit.face.normal.clone() : new THREE.Vector3(0, 1, 0);
@@ -902,5 +926,173 @@ export class RayGunSystem {
       timer: 0.28,
       maxTime: 0.28
     });
+  }
+
+  /**
+   * Sets up the faint sci-fi laser sight guide and target lock-on reticle
+   */
+  private setupLaserGuide() {
+    this.laserGuideGroup = new THREE.Group();
+    this.laserGuideGroup.visible = false;
+    this.scene.add(this.laserGuideGroup);
+
+    // 1. Thin glowing laser beam line (unit length cylinder oriented along +Z)
+    const lineGeo = new THREE.CylinderGeometry(0.007, 0.007, 1.0, 6);
+    lineGeo.translate(0, 0.5, 0);
+    lineGeo.rotateX(Math.PI / 2);
+    this.laserLineMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.laserLineMesh = new THREE.Mesh(lineGeo, this.laserLineMat);
+    this.laserGuideGroup.add(this.laserLineMesh);
+
+    // 2. Glowing target dot at hit point
+    const dotGeo = new THREE.SphereGeometry(0.045, 12, 12);
+    this.laserDotMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.laserDotMesh = new THREE.Mesh(dotGeo, this.laserDotMat);
+    this.laserGuideGroup.add(this.laserDotMesh);
+
+    // 3. Lock-on pulsing target ring
+    const ringGeo = new THREE.RingGeometry(0.12, 0.22, 18);
+    this.laserRingMat = new THREE.MeshBasicMaterial({
+      color: 0xfacc15,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.laserLockRing = new THREE.Mesh(ringGeo, this.laserRingMat);
+    this.laserGuideGroup.add(this.laserLockRing);
+  }
+
+  /**
+   * Evaluates all alive target spheres for Soft Aim Magnetism and Generous Hit Radius.
+   * If a target is within the magnetic forward cone (16 deg) or generous hit radius (1.6m),
+   * returns the target and the snapped direction directly toward it.
+   */
+  private findBestMagnetizedTarget(muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): { target: TargetSphere; direction: THREE.Vector3 } | null {
+    let bestTarget: TargetSphere | null = null;
+    let bestScore = Infinity; // Lower score = better target
+    let bestDir = new THREE.Vector3();
+
+    const maxAimDistance = 50.0;
+    const maxPerpDistance = 1.6; // Generous hit radius in meters
+    const maxConeAngleRad = 16.0 * (Math.PI / 180); // 16 degree forward cone
+
+    for (const target of this.targets) {
+      if (!target.isAlive) continue;
+
+      const targetPos = target.mesh.position;
+      const toTarget = targetPos.clone().sub(muzzlePos);
+      const projDist = toTarget.dot(aimDir);
+
+      // Must be in front of the player and within range
+      if (projDist < 0.6 || projDist > maxAimDistance) continue;
+
+      const closestPoint = muzzlePos.clone().addScaledVector(aimDir, projDist);
+      const perpDist = closestPoint.distanceTo(targetPos);
+      const dirToTarget = toTarget.clone().normalize();
+      const angleRad = aimDir.angleTo(dirToTarget);
+
+      // Check generous hit radius OR magnetic angular cone
+      const isWithinHitRadius = perpDist <= maxPerpDistance;
+      const isWithinMagnetCone = angleRad <= maxConeAngleRad && perpDist <= (maxPerpDistance + projDist * 0.12);
+
+      if (isWithinHitRadius || isWithinMagnetCone) {
+        // Prioritize targets closest to the center line
+        const score = angleRad * 2.5 + perpDist * 0.6 + projDist * 0.04;
+        if (score < bestScore) {
+          bestScore = score;
+          bestTarget = target;
+          bestDir.copy(dirToTarget);
+        }
+      }
+    }
+
+    if (bestTarget) {
+      return { target: bestTarget, direction: bestDir };
+    }
+    return null;
+  }
+
+  /**
+   * Updates laser sight line position, endpoint, and lock-on indicator
+   */
+  private updateLaserGuide(dt: number) {
+    if (!this.character.hasGun) {
+      this.laserGuideGroup.visible = false;
+      return;
+    }
+    this.laserGuideGroup.visible = true;
+
+    const { position: muzzlePos, direction: rawDir } = this.character.getMuzzlePositionAndDirection();
+
+    // Check for soft aim magnetism / generous hit target
+    const magnetized = this.findBestMagnetizedTarget(muzzlePos, rawDir);
+    const aimDir = magnetized ? magnetized.direction : rawDir;
+    this.isTargetLocked = !!magnetized;
+
+    // Raycast to find laser endpoint against colliders
+    const aliveTargets = this.targets.filter(t => t.isAlive).map(t => t.mesh);
+    const colliders = [...this.world.terrainColliders, this.plants.getGroup(), ...aliveTargets];
+    this.raycaster.set(muzzlePos, aimDir);
+    this.raycaster.far = 45.0;
+    const hits = this.raycaster.intersectObjects(colliders, true);
+
+    let endPoint: THREE.Vector3;
+
+    if (magnetized) {
+      endPoint = magnetized.target.mesh.position.clone();
+    } else if (hits.length > 0) {
+      endPoint = hits[0].point;
+    } else {
+      endPoint = muzzlePos.clone().addScaledVector(aimDir, 35.0);
+    }
+
+    const dist = muzzlePos.distanceTo(endPoint);
+
+    // Position and orient laser line
+    this.laserLineMesh.position.copy(muzzlePos);
+    this.laserLineMesh.lookAt(endPoint);
+    this.laserLineMesh.scale.set(1.0, 1.0, Math.max(0.01, dist));
+
+    // Position laser dot
+    this.laserDotMesh.position.copy(endPoint);
+
+    // Lock-on visual feedback
+    if (this.isTargetLocked) {
+      // Vibrant amber/gold lock-on
+      this.laserLineMat.color.setHex(0xfacc15);
+      this.laserLineMat.opacity = 0.55;
+      this.laserDotMat.color.setHex(0xfacc15);
+      this.laserDotMesh.scale.setScalar(1.5);
+
+      this.laserLockRing.position.copy(endPoint);
+      if (this.camera) {
+        this.laserLockRing.quaternion.copy(this.camera.quaternion);
+      } else {
+        this.laserLockRing.quaternion.copy(this.character.group.quaternion);
+      }
+      this.laserRingMat.opacity = 0.85;
+      this.laserLockRing.rotation.z += dt * 3.5;
+    } else {
+      // Faint cyber cyan guide
+      this.laserLineMat.color.setHex(0x00f0ff);
+      this.laserLineMat.opacity = 0.32;
+      this.laserDotMat.color.setHex(0x00f0ff);
+      this.laserDotMesh.scale.setScalar(1.0);
+      this.laserRingMat.opacity = 0.0;
+    }
   }
 }

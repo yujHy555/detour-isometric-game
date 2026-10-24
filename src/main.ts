@@ -112,7 +112,8 @@ class DetourGame {
       this.audio,
       this.character,
       this.world,
-      this.plants
+      this.plants,
+      this.cameraSystem.camera
     );
 
     this.rayGun.onGunCollected = () => {
