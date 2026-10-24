@@ -37,6 +37,7 @@ export class CharacterController {
   // Ray Gun System & Shooting Animation
   public hasGun: boolean = false;
   public gunMesh?: THREE.Object3D;
+  public gunEmitterNode?: THREE.Object3D;
   public handBone?: THREE.Bone;
   private shootAnimTimer: number = 0;
   private shootAction?: THREE.AnimationAction;
@@ -167,10 +168,16 @@ export class CharacterController {
             }
 
             // Detect Atom Ray Gun child on character's right hand
-            if (nameLower.includes('ray gun') || nameLower.includes('atom') || nameLower.includes('gun') || nameLower.includes('pistol')) {
+            if (nameLower.includes('ray gun') || nameLower.includes('atom') || (nameLower.includes('gun') && !nameLower.includes('emitter')) || nameLower.includes('pistol')) {
               this.gunMesh = child;
               this.gunMesh.visible = this.hasGun;
               console.log('[CharacterController] Identified Ray Gun mesh on character:', child.name);
+            }
+
+            // Detect empty_gun_emitter on tip of the gun barrel
+            if (nameLower.includes('emitter') || nameLower === 'empty_gun_emitter') {
+              this.gunEmitterNode = child;
+              console.log('[CharacterController] Identified Gun Emitter empty on character:', child.name);
             }
 
             if ((child as THREE.Bone).isBone && (nameLower === 'hand.r' || nameLower.includes('hand.r'))) {
@@ -549,17 +556,29 @@ export class CharacterController {
     if (this.gunMesh) {
       this.gunMesh.visible = true;
     }
+    if (this.gunEmitterNode) {
+      this.gunEmitterNode.visible = true;
+    }
     console.log('[CharacterController] Atom Ray Gun equipped into hand.r');
   }
 
   public getMuzzlePosition(): THREE.Vector3 {
+    // 1. Precise empty_gun_emitter added by user at tip of barrel
+    if (this.gunEmitterNode) {
+      this.gunEmitterNode.updateMatrixWorld(true);
+      const muzzlePos = new THREE.Vector3();
+      this.gunEmitterNode.getWorldPosition(muzzlePos);
+      return muzzlePos;
+    }
+    // 2. Fallback to gunMesh tip
     if (this.gunMesh) {
-      // Tip of the barrel at maxZ = 0.1232m, Y = 0.0086m in gunMesh local coordinates
+      this.gunMesh.updateMatrixWorld(true);
       const muzzleLocal = new THREE.Vector3(0, 0.0086, 0.1232);
       const worldPos = muzzleLocal.clone();
       this.gunMesh.localToWorld(worldPos);
       return worldPos;
     }
+    // 3. Fallback to hand bone
     if (this.handBone) {
       const muzzle = new THREE.Vector3();
       this.handBone.getWorldPosition(muzzle);

@@ -506,12 +506,11 @@ export class InputManager {
         }
         this.prevGamepadJump = btnAJump;
 
-        // B (1) or L3 (10) or RT (7) or RB (5): Sprint
+        // B (1) or L3 (10) or LT (6): Sprint (Never RT or RB, which are dedicated to Shooting!)
         const gpSprint = !!(
           gp.buttons[1]?.pressed ||
           gp.buttons[10]?.pressed ||
-          gp.buttons[7]?.pressed ||
-          gp.buttons[5]?.pressed
+          gp.buttons[6]?.pressed
         );
         this.gamepadState.btnB = !!gp.buttons[1]?.pressed;
         this.gamepadState.triggerR = !!(gp.buttons[7]?.pressed || gp.buttons[5]?.pressed);
