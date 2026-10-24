@@ -30,10 +30,10 @@ class DetourGame {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     this.clock = new THREE.Clock();
 
-    // Scene & Atmospheric Fog - Neo-Titan Deep Space Palette
+    // Scene & Atmospheric Fog - Clean Daylight Architectural Palette
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x090c16);
-    this.scene.fog = new THREE.FogExp2(0x090c16, 0.016);
+    this.scene.background = new THREE.Color(0xdce7f3);
+    this.scene.fog = new THREE.FogExp2(0xdce7f3, 0.012);
 
     // High Performance WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({

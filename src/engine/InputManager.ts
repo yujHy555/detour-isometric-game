@@ -355,8 +355,8 @@ export class InputManager {
       this.gamepadState.connected = false;
     }
 
-    // Jetpack Input (Keyboard F / E / Hold Space, Touch Jet button, or Gamepad Y / LB)
-    const kbJetpack = !!(this.keys['KeyF'] || this.keys['KeyE'] || this.keys['Space']);
+    // Jetpack Input: Strictly 'B' key on keyboard, touch Jet button on mobile, or Gamepad Y / LB
+    const kbJetpack = !!this.keys['KeyB'];
     this.isJetpackHeld = kbJetpack || this.touchJetpackActive || gpJetpack;
 
     this.moveVector.set(screenX, 0, screenZ);
