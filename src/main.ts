@@ -180,7 +180,7 @@ class DetourGame {
     // 1. Process Input
     this.inputManager.update(dt);
     this.inputManager.updateAimTarget(this.cameraSystem.camera, this.character.position.y);
-    const jumpPressed = this.inputManager.consumeJump();
+    const jumpPressed = this.inputManager.consumeJump() || (this.inputManager.isJumpKeyHeld() && this.character.isGrounded);
 
     if (this.inputManager.consumeCameraToggle()) {
       this.toggleCameraMode();

@@ -35,6 +35,7 @@ export class IsometricWorld {
 
     this.setupLighting(scene);
     this.buildTerrain();
+    this.group.updateMatrixWorld(true);
   }
 
   private setupLighting(scene: THREE.Scene) {
@@ -336,6 +337,7 @@ export class IsometricWorld {
    * Probes strictly from the character's current elevation down, preventing false hits on elevated sky platforms above.
    */
   public getTerrainHeight(x: number, z: number, fromY: number = 0.0): number {
+    this.group.updateMatrixWorld(true);
     const startY = fromY + 0.45;
     this.raycaster.set(new THREE.Vector3(x, startY, z), this.downVector);
     this.raycaster.far = 40.0;

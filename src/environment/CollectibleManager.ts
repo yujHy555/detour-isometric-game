@@ -3,7 +3,7 @@ import { AudioManager } from '../engine/AudioManager.ts';
 
 export interface CollectibleItem {
   mesh: THREE.Group;
-  shadowMesh: THREE.Mesh;
+  shadowMesh: THREE.Object3D;
   pos: THREE.Vector3;
   groundY: number;
   isCollected: boolean;
@@ -26,6 +26,8 @@ export class CollectibleManager {
   // Shared Contact Shadow (projected directly beneath each collectible onto floor/platform)
   private sharedShadowGeo: THREE.PlaneGeometry;
   private sharedShadowMat: THREE.MeshBasicMaterial;
+  private sharedProjRingGeo: THREE.RingGeometry;
+  private sharedProjRingMat: THREE.MeshBasicMaterial;
 
   // Pre-allocated collection shockwave VFX (zero runtime allocations)
   private vfxRing: THREE.Mesh;
@@ -79,7 +81,25 @@ export class CollectibleManager {
     this.sharedShadowMat = new THREE.MeshBasicMaterial({
       map: shadowTex,
       transparent: true,
-      depthWrite: false
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -4.0
+    });
+
+    // Shared cyan footprint projection ring to guarantee crystal-clear depth on all boxes and platforms
+    this.sharedProjRingGeo = new THREE.RingGeometry(0.36, 0.48, 24);
+    this.sharedProjRingGeo.rotateX(-Math.PI / 2);
+    this.sharedProjRingMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.55,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -4.0
     });
 
     // Pre-allocated VFX shockwave ring
@@ -137,20 +157,30 @@ export class CollectibleManager {
 
       this.scene.add(group);
 
-      // Contact Shadow directly beneath each collectible on whatever floor/platform is below
+      // Contact Shadow & Cyber Projection Ring directly beneath each collectible on whatever floor/platform/box is below
       const groundY = getTerrainHeight ? getTerrainHeight(pos.x, pos.z, pos.y) : 0.0;
+      const shadowGroup = new THREE.Group();
+      shadowGroup.position.set(pos.x, groundY + 0.03, pos.z);
+
       const shadow = new THREE.Mesh(this.sharedShadowGeo, this.sharedShadowMat);
-      shadow.position.set(pos.x, groundY + 0.02, pos.z);
+      shadow.renderOrder = 3;
+      shadowGroup.add(shadow);
+
+      // Glowing footprint target ring on surface
+      const targetRing = new THREE.Mesh(this.sharedProjRingGeo, this.sharedProjRingMat);
+      targetRing.position.y = 0.005;
+      targetRing.renderOrder = 4;
+      shadowGroup.add(targetRing);
 
       // Scale shadow based on elevation above ground for rich 3D depth perception
       const elevation = Math.max(0.1, pos.y - groundY);
       const shadowScale = THREE.MathUtils.clamp(1.2 - elevation * 0.08, 0.45, 1.1);
-      shadow.scale.set(shadowScale, shadowScale, shadowScale);
-      this.scene.add(shadow);
+      shadowGroup.scale.set(shadowScale, shadowScale, shadowScale);
+      this.scene.add(shadowGroup);
 
       this.items.push({
         mesh: group,
-        shadowMesh: shadow,
+        shadowMesh: shadowGroup,
         pos: pos.clone(),
         groundY,
         isCollected: false

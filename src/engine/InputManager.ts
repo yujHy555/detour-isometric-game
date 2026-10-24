@@ -91,6 +91,11 @@ export class InputManager {
     this.lastInputType = 'keyboard';
     if (e.button === 2) {
       this.isAiming = true;
+    } else if (e.button === 1) {
+      // Middle-click jump support (immune to any keyboard ghosting)
+      e.preventDefault();
+      this.jumpJustPressed = true;
+      this.jumpBufferTimer = 0.28;
     }
   }
 
@@ -115,9 +120,12 @@ export class InputManager {
     }
 
     // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, J, K, Numpad0
-    // Left Alt and C reside on separate matrix lines from W+A, completely bypassing hardware keyboard ghosting
+    // Checking code, key, keyCode, and which covers every browser implementation
     const isJumpKey = (
       e.code === 'Space' ||
+      e.key === ' ' ||
+      e.keyCode === 32 ||
+      e.which === 32 ||
       e.code === 'AltLeft' ||
       e.code === 'AltRight' ||
       e.code === 'KeyC' ||
@@ -129,7 +137,7 @@ export class InputManager {
     if (isJumpKey) {
       e.preventDefault();
       this.jumpJustPressed = true;
-      this.jumpBufferTimer = 0.22; // 220ms input buffer
+      this.jumpBufferTimer = 0.28; // 280ms input buffer
     }
 
     // Camera Mode Toggle Key: V
@@ -415,6 +423,18 @@ export class InputManager {
 
     // Sprint
     this.isRunning = sprintPressed;
+  }
+
+  public isJumpKeyHeld(): boolean {
+    return !!(
+      this.keys['Space'] ||
+      this.keys['AltLeft'] ||
+      this.keys['AltRight'] ||
+      this.keys['KeyC'] ||
+      this.keys['KeyJ'] ||
+      this.keys['KeyK'] ||
+      this.keys['Numpad0']
+    );
   }
 
   public consumeJump(): boolean {
