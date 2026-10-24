@@ -4,6 +4,7 @@ import { InputManager } from './engine/InputManager.ts';
 import { CharacterController } from './controllers/CharacterController.ts';
 import { IsometricWorld } from './environment/IsometricWorld.ts';
 import { CollectibleManager } from './environment/CollectibleManager.ts';
+import { PlantManager } from './environment/PlantManager.ts';
 import { AudioManager } from './engine/AudioManager.ts';
 
 class DetourGame {
@@ -15,6 +16,7 @@ class DetourGame {
   private character: CharacterController;
   private world: IsometricWorld;
   private collectibles: CollectibleManager;
+  public plants: PlantManager;
   private clock: THREE.Clock;
   private audio: AudioManager;
 
@@ -90,6 +92,12 @@ class DetourGame {
     this.collectibles = new CollectibleManager(
       this.scene,
       this.audio,
+      (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
+      (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
+    );
+
+    this.plants = new PlantManager(
+      this.scene,
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
