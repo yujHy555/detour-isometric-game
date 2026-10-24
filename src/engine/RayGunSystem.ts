@@ -406,20 +406,35 @@ export class RayGunSystem {
 
     this.cooldown = this.fireRate;
 
-    // 1. Calculate World Muzzle Position & Aim Vector
+    // 1. Turn character to face aim target precisely
+    const dx = aimWorldTarget.x - this.character.position.x;
+    const dz = aimWorldTarget.z - this.character.position.z;
+    if (dx * dx + dz * dz > 0.001) {
+      this.character.group.rotation.y = Math.atan2(dx, dz);
+      this.character.group.updateMatrixWorld(true);
+    }
+
+    // 2. Play shooting animation with full upper-body priority
+    this.character.playShootAnimation();
+    this.character.group.updateMatrixWorld(true);
+
+    // 3. Obtain exact physical barrel muzzle position in world space
     const muzzlePos = this.character.getMuzzlePosition();
 
-    // Aim toward mouse world point, matching chest/aim elevation
+    // 4. Ray shoots in a straight angle from the end of the barrel toward the crosshair
     const target = aimWorldTarget.clone();
-    target.y = Math.max(target.y, muzzlePos.y - 0.25);
-    const aimDir = target.clone().sub(muzzlePos).normalize();
+    const aimDir = target.sub(muzzlePos).normalize();
 
-    // Snap character facing direction to aim vector instantaneously
-    this.character.group.rotation.y = Math.atan2(aimDir.x, aimDir.z);
+    // Apply tactile physics recoil to character
+    this.character.velocity.addScaledVector(aimDir, -0.65);
 
-    // 2. Character Firing Animation & Recoil Physics
-    this.character.playShootAnimation();
-    this.character.velocity.addScaledVector(aimDir, -0.75); // Tactile physical kickback!
+    // Trigger visual crosshair kick in UI
+    const crosshairEl = document.getElementById('crosshair');
+    if (crosshairEl) {
+      crosshairEl.classList.remove('firing');
+      void crosshairEl.offsetWidth;
+      crosshairEl.classList.add('firing');
+    }
 
     // 3. Audio Firing Sound
     try {

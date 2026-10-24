@@ -543,7 +543,7 @@ class DetourGame {
 
     // 1. Process Input
     this.inputManager.update(dt);
-    this.inputManager.updateAimTarget(this.cameraSystem.camera, this.character.position.y);
+    this.inputManager.updateAimTarget(this.cameraSystem.camera, this.character.position.y, this.character.position);
     const jumpPressed = this.inputManager.consumeJump() || (this.inputManager.isJumpKeyHeld() && this.character.isGrounded);
 
     if (this.inputManager.consumeCameraToggle()) {
@@ -554,6 +554,27 @@ class DetourGame {
     this.updateHUD(dt);
     this.updateMenuParticles(dt);
     this.updateGamepadHUD();
+
+    // Update Holographic Crosshair tracking Mouse / Gamepad Right Toggle
+    const crosshairEl = document.getElementById('crosshair');
+    if (crosshairEl) {
+      if (this.character.hasGun && this.rayGun.isGunCollected) {
+        if (crosshairEl.style.display !== 'block') {
+          crosshairEl.style.display = 'block';
+        }
+        crosshairEl.style.left = `${this.inputManager.getMouseScreenX().toFixed(1)}px`;
+        crosshairEl.style.top = `${this.inputManager.getMouseScreenY().toFixed(1)}px`;
+        if (this.inputManager.isAiming) {
+          crosshairEl.classList.add('aiming');
+        } else {
+          crosshairEl.classList.remove('aiming');
+        }
+      } else {
+        if (crosshairEl.style.display !== 'none') {
+          crosshairEl.style.display = 'none';
+        }
+      }
+    }
 
     // 3. Update Character Physics & Animation
     this.character.update(
@@ -574,8 +595,8 @@ class DetourGame {
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
 
-    // 4. Ray Gun Shooting System & Dynamic VFX
-    if (this.inputManager.consumeShoot() || (this.inputManager.isShootingHeld && this.character.hasGun)) {
+    // 4. Ray Gun Shooting System (Fires on deliberate click or held fire with cooldown, never on pickup!)
+    if (this.character.hasGun && (this.inputManager.consumeShoot() || this.inputManager.isShootingHeld)) {
       this.rayGun.shoot(this.inputManager.mouseWorldTarget);
     }
     this.rayGun.update(dt);

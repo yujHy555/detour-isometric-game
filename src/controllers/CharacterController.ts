@@ -484,14 +484,15 @@ export class CharacterController {
   }
 
   public getMuzzlePosition(): THREE.Vector3 {
-    const muzzle = new THREE.Vector3();
     if (this.gunMesh) {
-      this.gunMesh.getWorldPosition(muzzle);
-      const fwd = new THREE.Vector3(0, 0, 0.45).applyQuaternion(this.group.quaternion);
-      muzzle.add(fwd);
-      return muzzle;
+      // Tip of the barrel at maxZ = 0.1232m, Y = 0.0086m in gunMesh local coordinates
+      const muzzleLocal = new THREE.Vector3(0, 0.0086, 0.1232);
+      const worldPos = muzzleLocal.clone();
+      this.gunMesh.localToWorld(worldPos);
+      return worldPos;
     }
     if (this.handBone) {
+      const muzzle = new THREE.Vector3();
       this.handBone.getWorldPosition(muzzle);
       const fwd = new THREE.Vector3(0, 0, 0.40).applyQuaternion(this.group.quaternion);
       muzzle.add(fwd);
@@ -502,13 +503,17 @@ export class CharacterController {
   }
 
   public playShootAnimation() {
-    this.shootAnimTimer = 0.32;
+    this.shootAnimTimer = 0.35;
     const shootAction = this.findAction('shoot');
     if (shootAction) {
+      if (this.currentAction && this.currentAction !== shootAction) {
+        this.currentAction.fadeOut(0.06);
+      }
       shootAction.reset();
       shootAction.setLoop(THREE.LoopOnce, 1);
-      shootAction.clampWhenFinished = false;
+      shootAction.clampWhenFinished = true;
       shootAction.fadeIn(0.04).play();
+      this.currentAction = shootAction;
     }
   }
 

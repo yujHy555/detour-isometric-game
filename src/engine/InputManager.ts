@@ -48,8 +48,10 @@ export class InputManager {
   private prevGamepadAction: boolean = false;
   private prevGamepadShoot: boolean = false;
 
-  private mouseScreenX: number = 0;
-  private mouseScreenY: number = 0;
+  private mouseLeftDown: boolean = false;
+  private touchFireActive: boolean = false;
+  private mouseScreenX: number = window.innerWidth / 2;
+  private mouseScreenY: number = window.innerHeight / 2;
 
   // Touch joystick tracking
   private touchActive: boolean = false;
@@ -96,6 +98,7 @@ export class InputManager {
     this.lastInputType = 'keyboard';
     if (e.button === 0) {
       // Primary shoot fire
+      this.mouseLeftDown = true;
       this.shootJustPressed = true;
       this.isShootingHeld = true;
     } else if (e.button === 2) {
@@ -110,6 +113,7 @@ export class InputManager {
 
   private onMouseUp(e: MouseEvent) {
     if (e.button === 0) {
+      this.mouseLeftDown = false;
       this.isShootingHeld = false;
     } else if (e.button === 2) {
       this.isAiming = false;
@@ -121,6 +125,10 @@ export class InputManager {
     this.shiftDown = false;
     this.jumpJustPressed = false;
     this.jumpBufferTimer = 0;
+    this.mouseLeftDown = false;
+    this.touchFireActive = false;
+    this.shootJustPressed = false;
+    this.isShootingHeld = false;
   }
 
   private onKeyDown(e: KeyboardEvent) {
@@ -336,15 +344,19 @@ export class InputManager {
       btnFire.addEventListener('touchstart', (e) => {
         e.preventDefault();
         this.lastInputType = 'touch';
+        this.touchFireActive = true;
         this.shootJustPressed = true;
         this.isShootingHeld = true;
       });
       const stopFire = (e: TouchEvent) => {
         e.preventDefault();
+        this.touchFireActive = false;
         this.isShootingHeld = false;
       };
       btnFire.addEventListener('touchend', stopFire);
       btnFire.addEventListener('touchcancel', stopFire);
+      window.addEventListener('touchend', stopFire);
+      window.addEventListener('touchcancel', stopFire);
     }
   }
 
@@ -364,7 +376,29 @@ export class InputManager {
     this.touchMoveVector.y = dy / maxDist;
   }
 
-  public updateAimTarget(camera: THREE.Camera, planeY: number = 0) {
+  public updateAimTarget(camera: THREE.Camera, planeY: number = 0, characterPos?: THREE.Vector3) {
+    // 1. Gamepad Right Toggle Aiming Control
+    if (this.lastInputType === 'gamepad' && characterPos) {
+      const rx = this.gamepadState.stickR.x;
+      const ry = this.gamepadState.stickR.y;
+      const mag = Math.hypot(rx, ry);
+      if (mag > 0.18) {
+        this.isAiming = true;
+        // Transform right stick input into isometric world direction
+        const aimOffset = new THREE.Vector3(rx, 0, ry).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.isoAngle).normalize();
+        const aimDist = 7.0 + mag * 5.0;
+        this.mouseWorldTarget.copy(characterPos).addScaledVector(aimOffset, aimDist);
+        this.mouseWorldTarget.y = planeY;
+
+        // Project 3D aim target to 2D screen coordinates for crosshair UI
+        const screenProj = this.mouseWorldTarget.clone().project(camera);
+        this.mouseScreenX = (screenProj.x * 0.5 + 0.5) * window.innerWidth;
+        this.mouseScreenY = (-screenProj.y * 0.5 + 0.5) * window.innerHeight;
+        return;
+      }
+    }
+
+    // 2. Mouse Aiming Control
     if (!this.hasMouse) return;
 
     const ndcX = (this.mouseScreenX / window.innerWidth) * 2 - 1;
@@ -378,6 +412,14 @@ export class InputManager {
       const distance = (planeY - rayOrigin.y) / rayDir.y;
       this.mouseWorldTarget.copy(rayOrigin).addScaledVector(rayDir, distance);
     }
+  }
+
+  public getMouseScreenX(): number {
+    return this.mouseScreenX;
+  }
+
+  public getMouseScreenY(): number {
+    return this.mouseScreenY;
   }
 
   public update(dt: number = 0.016) {
@@ -404,6 +446,7 @@ export class InputManager {
 
     // 3. Gamepad Input Polling (Strictly disabled on mobile devices)
     let gpJetpack = false;
+    let gpShoot = false;
     if (!this.isMobile) {
       const gamepads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
       let gpFound = false;
@@ -496,10 +539,10 @@ export class InputManager {
           this.shootJustPressed = true;
           this.lastInputType = 'gamepad';
         }
-        if (gpShootPressed) {
-          this.isShootingHeld = true;
-        }
         this.prevGamepadShoot = gpShootPressed;
+        if (gpShootPressed) {
+          gpShoot = true;
+        }
 
         // Right stick aim if engaged
         if (Math.hypot(rx, ry) > 0.3) {
@@ -522,6 +565,10 @@ export class InputManager {
     // Jetpack Input: Strictly 'B' key on keyboard, touch Jet button on mobile, or Gamepad Y / LB
     const kbJetpack = !!(this.keys['KeyB'] || this.keys['b'] || this.keys['B']);
     this.isJetpackHeld = kbJetpack || this.touchJetpackActive || gpJetpack;
+
+    // Shooting held state: strictly true only when actively pressed
+    const kbShoot = !!(this.keys['KeyF'] || this.keys['f'] || this.keys['KeyQ'] || this.keys['q']);
+    this.isShootingHeld = this.mouseLeftDown || kbShoot || gpShoot || this.touchFireActive;
 
     this.moveVector.set(screenX, 0, screenZ);
     if (this.moveVector.lengthSq() > 1.0) {
