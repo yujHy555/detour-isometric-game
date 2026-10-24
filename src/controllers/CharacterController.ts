@@ -601,9 +601,48 @@ export class CharacterController {
     return this.position.clone().add(chestOffset);
   }
 
+  public applyProceduralAimStance() {
+    if (this.aimStanceWeight <= 0.005) return;
+
+    const recoilFraction = this.recoilTimer > 0 ? (this.recoilTimer / 0.12) : 0;
+    const recoilPitch = Math.sin(recoilFraction * Math.PI) * 0.22; // Punchy 12.5 deg tactile recoil
+
+    if (this.upperArmBone) {
+      // Horizontal forward aim posture (ax: -170 deg, az: 80 deg)
+      const targetArmQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(-170 * (Math.PI / 180) + recoilPitch * 0.4, 0, 80 * (Math.PI / 180))
+      );
+      this.upperArmBone.quaternion.slerp(targetArmQuat, this.aimStanceWeight);
+    }
+    if (this.forearmBone) {
+      // Forearm twist (Y = 160 deg) rotates the right hand and palm directly toward the sky
+      const targetForearmQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, 160 * (Math.PI / 180), recoilPitch * 0.25)
+      );
+      this.forearmBone.quaternion.slerp(targetForearmQuat, this.aimStanceWeight);
+    }
+    if (this.handBone) {
+      // Hand wrist offset (Z = -30 deg) aligns the barrel straight forward while palm faces the sky
+      const targetHandQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(recoilPitch, 0, -30 * (Math.PI / 180))
+      );
+      this.handBone.quaternion.slerp(targetHandQuat, this.aimStanceWeight);
+    }
+
+    if (this.modelMesh) {
+      this.modelMesh.updateMatrixWorld(true);
+    }
+    if (this.gunEmitterNode) {
+      this.gunEmitterNode.updateWorldMatrix(true, false);
+    }
+  }
+
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
     this.recoilTimer = 0.12;
+    this.aimStanceWeight = 1.0; // Snap stance weight to 1.0 immediately on trigger pull
+    this.applyProceduralAimStance(); // Ensure barrel and empty_gun_emitter are in forward aim position before ray emits
+
     const shootAction = this.shootAction || this.findAction('shoot');
     if (shootAction) {
       shootAction.reset();
@@ -1002,30 +1041,8 @@ export class CharacterController {
         }
       }
 
-      // 6. Procedural AAA Forward Aim Stance & Recoil Kick (Puts right arm fully into shooting position)
-      if (this.aimStanceWeight > 0.005) {
-        const recoilFraction = this.recoilTimer > 0 ? (this.recoilTimer / 0.12) : 0;
-        const recoilPitch = Math.sin(recoilFraction * Math.PI) * 0.22; // Punchy 12.5 deg tactile recoil
-
-        if (this.upperArmBone) {
-          const targetArmQuat = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(-162 * (Math.PI / 180) + recoilPitch * 0.4, 0, 90 * (Math.PI / 180))
-          );
-          this.upperArmBone.quaternion.slerp(targetArmQuat, this.aimStanceWeight);
-        }
-        if (this.forearmBone) {
-          const targetForearmQuat = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(0, 0, recoilPitch * 0.25)
-          );
-          this.forearmBone.quaternion.slerp(targetForearmQuat, this.aimStanceWeight);
-        }
-        if (this.handBone) {
-          const targetHandQuat = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(recoilPitch, 0, 0)
-          );
-          this.handBone.quaternion.slerp(targetHandQuat, this.aimStanceWeight);
-        }
-      }
+      // 6. Procedural AAA Forward Aim Stance & Recoil Kick (Puts right arm fully into shooting position with palm facing sky)
+      this.applyProceduralAimStance();
     }
   }
 }

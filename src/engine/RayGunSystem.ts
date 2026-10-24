@@ -453,17 +453,18 @@ export class RayGunSystem {
 
     this.cooldown = this.fireRate;
 
-    // 1. Play shooting animation with full upper-body priority
+    // 1. Play shooting animation and apply procedural forward aim stance
     this.character.playShootAnimation();
+    this.character.applyProceduralAimStance();
     this.character.group.updateMatrixWorld(true);
 
-    // 2. The straight forward direction the player is standing in:
+    // 2. Obtain exact physical barrel muzzle position from empty_gun_emitter in world space
+    const muzzlePos = this.character.getMuzzlePosition();
+
+    // 3. The straight forward direction the player is standing in:
     const rotY = this.character.group.rotation.y;
     const forwardDir = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)).normalize();
     const aimDir = forwardDir;
-
-    // 3. Obtain exact physical barrel muzzle position at the tip of the barrel in world space
-    const muzzlePos = this.character.getMuzzlePosition();
 
     // 4. Physical recoil impulse pushes character slightly backward opposite to facing direction
     this.character.velocity.addScaledVector(forwardDir, -0.65);
