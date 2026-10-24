@@ -38,9 +38,13 @@ export class CharacterController {
   public hasGun: boolean = false;
   public gunMesh?: THREE.Object3D;
   public gunEmitterNode?: THREE.Object3D;
+  public upperArmBone?: THREE.Bone;
+  public forearmBone?: THREE.Bone;
   public handBone?: THREE.Bone;
   private shootAnimTimer: number = 0;
   private shootAction?: THREE.AnimationAction;
+  private aimStanceWeight: number = 0;
+  private recoilTimer: number = 0;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
   private spineBone?: THREE.Bone;
   private jetpackFlamesGroup!: THREE.Group;
@@ -180,8 +184,15 @@ export class CharacterController {
               console.log('[CharacterController] Identified Gun Emitter empty on character:', child.name);
             }
 
-            if ((child as THREE.Bone).isBone && (nameLower === 'hand.r' || nameLower.includes('hand.r'))) {
-              this.handBone = child as THREE.Bone;
+            // Cache right arm bones for procedural AAA forward aim stance & recoil kick
+            if ((child as THREE.Bone).isBone) {
+              if (nameLower === 'arm_stretch.r' || nameLower === 'arm_stretchr') {
+                this.upperArmBone = child as THREE.Bone;
+              } else if (nameLower === 'forearm_stretch.r' || nameLower === 'forearm_stretchr') {
+                this.forearmBone = child as THREE.Bone;
+              } else if (nameLower === 'hand.r' || nameLower.includes('hand.r') || nameLower === 'handr') {
+                this.handBone = child as THREE.Bone;
+              }
             }
 
             if ((child as THREE.Mesh).isMesh) {
@@ -592,6 +603,7 @@ export class CharacterController {
 
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
+    this.recoilTimer = 0.12;
     const shootAction = this.shootAction || this.findAction('shoot');
     if (shootAction) {
       shootAction.reset();
@@ -940,12 +952,18 @@ export class CharacterController {
       (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.65 - heightAboveGround * 0.1, 0.1, 0.65);
     }
 
-    // Layered Upper-Body Shoot Animation Decay
+    // Layered Upper-Body Shoot Animation Decay & Procedural Aim Blend
     if (this.shootAnimTimer > 0) {
       this.shootAnimTimer -= dt;
+      this.aimStanceWeight = THREE.MathUtils.lerp(this.aimStanceWeight, 1.0, dt * 25.0);
       if (this.shootAnimTimer <= 0 && this.shootAction) {
         (this.shootAction as any)._scheduleFading(0.08, this.shootAction.getEffectiveWeight(), 0);
       }
+    } else {
+      this.aimStanceWeight = THREE.MathUtils.lerp(this.aimStanceWeight, 0.0, dt * 10.0);
+    }
+    if (this.recoilTimer > 0) {
+      this.recoilTimer = Math.max(0, this.recoilTimer - dt);
     }
 
     // 5. Animation State Machine (Jetpack -> Jump/Fall -> Walk/Run -> Idle)
@@ -981,6 +999,31 @@ export class CharacterController {
           this.currentAction.timeScale = 1.25; // Snappy jump arc
         } else {
           this.currentAction.timeScale = 1.0;
+        }
+      }
+
+      // 6. Procedural AAA Forward Aim Stance & Recoil Kick (Puts right arm fully into shooting position)
+      if (this.aimStanceWeight > 0.005) {
+        const recoilFraction = this.recoilTimer > 0 ? (this.recoilTimer / 0.12) : 0;
+        const recoilPitch = Math.sin(recoilFraction * Math.PI) * 0.22; // Punchy 12.5 deg tactile recoil
+
+        if (this.upperArmBone) {
+          const targetArmQuat = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(-162 * (Math.PI / 180) + recoilPitch * 0.4, 0, 90 * (Math.PI / 180))
+          );
+          this.upperArmBone.quaternion.slerp(targetArmQuat, this.aimStanceWeight);
+        }
+        if (this.forearmBone) {
+          const targetForearmQuat = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(0, 0, recoilPitch * 0.25)
+          );
+          this.forearmBone.quaternion.slerp(targetForearmQuat, this.aimStanceWeight);
+        }
+        if (this.handBone) {
+          const targetHandQuat = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(recoilPitch, 0, 0)
+          );
+          this.handBone.quaternion.slerp(targetHandQuat, this.aimStanceWeight);
         }
       }
     }
