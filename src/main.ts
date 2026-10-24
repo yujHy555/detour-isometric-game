@@ -30,10 +30,10 @@ class DetourGame {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     this.clock = new THREE.Clock();
 
-    // Scene & Atmospheric Fog
+    // Scene & Atmospheric Fog - Neo-Titan Deep Space Palette
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0c14);
-    this.scene.fog = new THREE.FogExp2(0x0a0c14, 0.015);
+    this.scene.background = new THREE.Color(0x090c16);
+    this.scene.fog = new THREE.FogExp2(0x090c16, 0.016);
 
     // High Performance WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -101,7 +101,7 @@ class DetourGame {
   }
 
   private updateGamepadHUD() {
-    if (!this.gamepadHud) return;
+    if (!this.gamepadHud || this.inputManager.isMobile) return;
 
     const state = this.inputManager.gamepadState;
     if (this.gpStatusBadge) {
@@ -165,6 +165,7 @@ class DetourGame {
       this.inputManager.moveVector,
       this.inputManager.isRunning,
       jumpPressed,
+      this.inputManager.isJetpackHeld,
       this.inputManager.mouseWorldTarget,
       this.inputManager.isAiming,
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),

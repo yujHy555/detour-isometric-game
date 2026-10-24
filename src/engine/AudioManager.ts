@@ -3,6 +3,11 @@ export class AudioManager {
   private isMuted: boolean = false;
   private noiseBuffer?: AudioBuffer;
 
+  // Continuous Jetpack Audio Nodes
+  private jetGain?: GainNode;
+  private jetOsc?: OscillatorNode;
+  private jetNoise?: AudioBufferSourceNode;
+
   constructor() {
     // AudioContext will initialize on first user gesture
     const initAudio = () => {
@@ -188,5 +193,88 @@ export class AudioManager {
       noise.start(t);
       noise.stop(t + 0.18);
     }
+  }
+
+  /**
+   * Continuous Cyber Jetpack Propulsion Audio
+   */
+  public startJetpack() {
+    this.resume();
+    if (!this.ctx || this.isMuted || this.jetGain) return;
+
+    const t = this.ctx.currentTime;
+    const masterGain = this.ctx.createGain();
+    masterGain.gain.setValueAtTime(0.001, t);
+    masterGain.gain.exponentialRampToValueAtTime(0.24, t + 0.12);
+    masterGain.connect(this.ctx.destination);
+    this.jetGain = masterGain;
+
+    // Sub-harmonic plasma turbine hum
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(110, t);
+    osc.frequency.exponentialRampToValueAtTime(180, t + 0.25);
+
+    const oscFilter = this.ctx.createBiquadFilter();
+    oscFilter.type = 'lowpass';
+    oscFilter.frequency.setValueAtTime(320, t);
+
+    const oscGain = this.ctx.createGain();
+    oscGain.gain.setValueAtTime(0.18, t);
+
+    osc.connect(oscFilter);
+    oscFilter.connect(oscGain);
+    oscGain.connect(masterGain);
+    osc.start(t);
+    this.jetOsc = osc;
+
+    // High velocity gas hiss / exhaust rush
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      noise.loop = true;
+
+      const noiseFilter = this.ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.setValueAtTime(2200, t);
+      noiseFilter.Q.setValueAtTime(1.8, t);
+
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.16, t);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+      noise.start(t);
+      this.jetNoise = noise;
+    }
+  }
+
+  public stopJetpack() {
+    if (!this.ctx || !this.jetGain) return;
+
+    const t = this.ctx.currentTime;
+    this.jetGain.gain.setValueAtTime(this.jetGain.gain.value, t);
+    this.jetGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+
+    const oldOsc = this.jetOsc;
+    const oldNoise = this.jetNoise;
+    const oldGain = this.jetGain;
+
+    this.jetGain = undefined;
+    this.jetOsc = undefined;
+    this.jetNoise = undefined;
+
+    setTimeout(() => {
+      try {
+        oldOsc?.stop();
+        oldNoise?.stop();
+        oldOsc?.disconnect();
+        oldNoise?.disconnect();
+        oldGain?.disconnect();
+      } catch {
+        // Disposed
+      }
+    }, 220);
   }
 }

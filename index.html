@@ -103,6 +103,13 @@
       }
     }
 
+    /* Hide gamepad controls and HUD entirely on mobile / touch devices */
+    @media (max-width: 1024px) {
+      #gamepad-hud, #btn-toggle-gamepad {
+        display: none !important;
+      }
+    }
+
     /* Main HUD */
     #hud-overlay {
       position: absolute;
@@ -456,6 +463,15 @@
       box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
       color: #fef3c7;
     }
+    #btn-touch-jetpack {
+      border-color: rgba(56, 189, 248, 0.6);
+    }
+    #btn-touch-jetpack.active, #btn-touch-jetpack:active {
+      background: rgba(14, 165, 233, 0.45);
+      border-color: #38bdf8;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.8);
+      transform: scale(0.94);
+    }
     #btn-touch-jump {
       border-color: rgba(52, 211, 153, 0.5);
     }
@@ -502,8 +518,8 @@
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move (Iso) &bull; 
         <kbd>Shift</kbd> Sprint &bull; 
         <kbd>Space</kbd> Jump &amp; Double Jump &bull; 
-        <kbd>Right-Click</kbd> Aim &bull;
-        <kbd>Gamepad</kbd> Full Plug &amp; Play
+        <kbd>F</kbd> or Hold <kbd>Space</kbd> Jetpack Fly &bull; 
+        <kbd>Right-Click</kbd> Aim
       </div>
     </div>
   </div>
@@ -608,6 +624,10 @@
       <div class="mobile-btn" id="btn-touch-sprint">
         <span>RUN</span>
         <span class="sub">TOGGLE</span>
+      </div>
+      <div class="mobile-btn" id="btn-touch-jetpack">
+        <span>JET</span>
+        <span class="sub">FLY</span>
       </div>
       <div class="mobile-btn" id="btn-touch-action">
         <span>ACT</span>

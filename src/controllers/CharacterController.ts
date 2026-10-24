@@ -7,7 +7,8 @@ export enum CharacterState {
   WALK = 'walk',
   RUN = 'run',
   JUMP = 'jump',
-  FALL = 'fall'
+  FALL = 'fall',
+  FLY = 'fly'
 }
 
 export class CharacterController {
@@ -27,12 +28,10 @@ export class CharacterController {
   private actions: Map<string, THREE.AnimationAction> = new Map();
   private currentAction?: THREE.AnimationAction;
 
-  // Animated Emissive Canvas Texture & Materials
-  private emissionCtx?: CanvasRenderingContext2D;
-  private emissionImage?: HTMLImageElement;
-  private emissionTexture?: THREE.CanvasTexture;
-  private emissiveMaterials: THREE.MeshStandardMaterial[] = [];
-  private emissionTimer: number = 0;
+  // Jetpack Flight System
+  public isFlying: boolean = false;
+  private flyTimer: number = 0;
+  private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
 
   // Procedural Rig Parts (Fallback before custom model is loaded)
   private leftLeg?: THREE.Mesh;
@@ -195,53 +194,27 @@ export class CharacterController {
               mesh.castShadow = true;
               mesh.receiveShadow = true;
 
-              // Apply and setup targeted emission on character materials
+              // Clean material setup without emission textures
               const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
               for (const m of materials) {
                 if (m instanceof THREE.MeshStandardMaterial) {
                   const matName = m.name.toLowerCase();
-                  if (matName.includes('main_colors') || m.emissiveMap) {
-                    m.emissive = new THREE.Color(0xffffff);
-                    m.emissiveIntensity = 1.0;
-                    m.needsUpdate = true;
-                    if (!this.emissiveMaterials.includes(m)) {
-                      this.emissiveMaterials.push(m);
-                    }
-                  } else if (matName.includes('glass')) {
-                    // Enhance glass visor transparency so glowing interior lights shine through
+                  if (matName.includes('glass')) {
                     m.transparent = true;
-                    m.opacity = 0.82;
-                    m.roughness = 0.15;
-                    m.needsUpdate = true;
+                    m.opacity = 0.85;
+                    m.roughness = 0.12;
+                    m.metalness = 0.85;
                   }
+                  // Clear emissive maps / flashing
+                  m.emissive.setHex(0x000000);
+                  m.emissiveMap = null;
+                  m.emissiveIntensity = 0;
+                  m.needsUpdate = true;
                 }
               }
             }
           });
           this.group.add(this.modelMesh);
-
-          // Load targeted button/lights emission map and initialize the dynamic canvas texture
-          const img = new Image();
-          img.src = '/models/character_emission.png';
-          img.onload = () => {
-            this.emissionImage = img;
-            const canvas = document.createElement('canvas');
-            canvas.width = 128;
-            canvas.height = 128;
-            const ctx = canvas.getContext('2d')!;
-            ctx.drawImage(img, 0, 0);
-
-            const canvasTex = new THREE.CanvasTexture(canvas);
-            canvasTex.colorSpace = THREE.SRGBColorSpace;
-            canvasTex.flipY = false;
-            this.emissionCtx = ctx;
-            this.emissionTexture = canvasTex;
-
-            for (const mat of this.emissiveMaterials) {
-              mat.emissiveMap = canvasTex;
-              mat.needsUpdate = true;
-            }
-          };
 
           // Setup Animations
           if (gltf.animations && gltf.animations.length > 0) {
@@ -420,11 +393,61 @@ export class CharacterController {
     }
   }
 
+  private spawnThrusterParticle() {
+    const geo = new THREE.SphereGeometry(0.06, 6, 6);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false
+    });
+    const p = new THREE.Mesh(geo, mat);
+    const backOffset = -0.22;
+    const sinR = Math.sin(this.group.rotation.y);
+    const cosR = Math.cos(this.group.rotation.y);
+    const px = this.position.x + backOffset * sinR + (Math.random() - 0.5) * 0.15;
+    const py = this.position.y + 0.65;
+    const pz = this.position.z + backOffset * cosR + (Math.random() - 0.5) * 0.15;
+    p.position.set(px, py, pz);
+    this.sceneRef.add(p);
+
+    this.thrusterParticles.push({
+      mesh: p,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: -2.8 - Math.random() * 1.5,
+      vz: (Math.random() - 0.5) * 0.4,
+      timer: 0,
+      maxTime: 0.22 + Math.random() * 0.08
+    });
+  }
+
+  private updateThrusterParticles(dt: number) {
+    for (let i = this.thrusterParticles.length - 1; i >= 0; i--) {
+      const tp = this.thrusterParticles[i];
+      tp.timer += dt;
+      const progress = tp.timer / tp.maxTime;
+      if (progress >= 1.0) {
+        this.sceneRef.remove(tp.mesh);
+        tp.mesh.geometry.dispose();
+        (tp.mesh.material as THREE.Material).dispose();
+        this.thrusterParticles.splice(i, 1);
+      } else {
+        tp.mesh.position.x += tp.vx * dt;
+        tp.mesh.position.y += tp.vy * dt;
+        tp.mesh.position.z += tp.vz * dt;
+        const scale = 1.0 + progress * 2.0;
+        tp.mesh.scale.set(scale, scale, scale);
+        (tp.mesh.material as THREE.MeshBasicMaterial).opacity = (1.0 - progress) * 0.85;
+      }
+    }
+  }
+
   public update(
     dt: number,
     moveVector: THREE.Vector3,
     isRunning: boolean,
     jumpPressed: boolean,
+    jetpackHeld: boolean,
     aimTarget: THREE.Vector3,
     isAiming: boolean,
     getTerrainHeight: (x: number, z: number, fromY?: number) => number,
@@ -433,37 +456,8 @@ export class CharacterController {
     this.animTimer += dt;
     this.updateJumpRings(dt);
     this.updateDustPuffs(dt);
+    this.updateThrusterParticles(dt);
 
-    // Animate glowing emissive texture: only scroll the moving lights strip (y >= 103)
-    // Buttons and suit body in rows 0-102 remain perfectly fixed so the body never emits
-    this.emissionTimer += dt;
-    if (this.emissionCtx && this.emissionImage && this.emissionTexture) {
-      const img = this.emissionImage;
-      const scrollX = Math.floor((this.emissionTimer * 36) % 128);
-      const stripY = 103;
-      const stripH = 25;
-
-      this.emissionCtx.drawImage(img, scrollX, stripY, 128 - scrollX, stripH, 0, stripY, 128 - scrollX, stripH);
-      if (scrollX > 0) {
-        this.emissionCtx.drawImage(img, 0, stripY, scrollX, stripH, 128 - scrollX, stripY, scrollX, stripH);
-      }
-      this.emissionTexture.needsUpdate = true;
-    }
-
-    // High-visibility sci-fi strobe & beacon pulse on allocated buttons/lights
-    const cycle = this.emissionTimer % 1.25;
-    let flash = 1.0;
-    if (cycle < 0.12) {
-      flash = THREE.MathUtils.lerp(1.0, 5.0, Math.sin((cycle / 0.12) * Math.PI));
-    } else if (cycle > 0.18 && cycle < 0.3) {
-      flash = THREE.MathUtils.lerp(1.0, 4.0, Math.sin(((cycle - 0.18) / 0.12) * Math.PI));
-    } else {
-      flash = 0.8 + Math.sin(this.emissionTimer * 5.0) * 0.35;
-    }
-
-    for (const mat of this.emissiveMaterials) {
-      mat.emissiveIntensity = flash;
-    }
     const inputMoving = moveVector.lengthSq() > 0.001;
     const currentSpeed = isRunning ? this.runSpeed : this.walkSpeed;
 
@@ -508,7 +502,7 @@ export class CharacterController {
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     const isMoving = inputMoving && horizontalSpeed > 0.05;
 
-    // 2. Jump & Double Jump Handling
+    // 2. Jump & Jetpack Flight Handling
     if (jumpPressed) {
       if (this.isGrounded) {
         // First jump from ground
@@ -533,9 +527,46 @@ export class CharacterController {
       }
     }
 
-    // Apply gravity when airborne
-    if (!this.isGrounded) {
-      this.velocity.y += this.gravity * dt;
+    // Jetpack continuous flight mechanics
+    if (jetpackHeld) {
+      if (!this.isFlying) {
+        this.isFlying = true;
+        this.flyTimer = 0;
+        this.audio.startJetpack();
+      }
+      this.flyTimer += dt;
+      this.isGrounded = false;
+
+      // Spawn thruster particles
+      if (Math.random() < 0.72) {
+        this.spawnThrusterParticle();
+      }
+
+      // Initial lift-off: if starting from stationary ground, float up slowly in idle pose
+      if (this.flyTimer < 0.42 && !isMoving && !this.wasInAir) {
+        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 2.2, dt * 5.0);
+      } else {
+        // Full flight ascent & animation
+        this.velocity.y = THREE.MathUtils.lerp(this.velocity.y, 4.8, dt * 7.0);
+      }
+
+      // Responsive horizontal aerial locomotion while jetpacking
+      if (inputMoving) {
+        const flyHozSpeed = this.runSpeed * 1.15;
+        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveVector.x * flyHozSpeed, dt * 10.0);
+        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveVector.z * flyHozSpeed, dt * 10.0);
+      }
+    } else {
+      if (this.isFlying) {
+        this.isFlying = false;
+        this.flyTimer = 0;
+        this.audio.stopJetpack();
+      }
+
+      // Apply gravity when airborne without active jetpack thrust
+      if (!this.isGrounded) {
+        this.velocity.y += this.gravity * dt;
+      }
     }
 
     // Integrate Horizontal Motion
@@ -575,13 +606,18 @@ export class CharacterController {
         this.isGrounded = false;
       }
     } else {
-      // Airborne / falling
+      // Airborne / falling / jetpacking
       if (this.position.y <= groundY) {
-        // Touchdown on terrain - reset jumps!
+        // Touchdown on terrain - reset jumps and flight
         this.position.y = groundY;
         this.velocity.y = 0;
         this.isGrounded = true;
         this.jumpCount = 0;
+        if (this.isFlying && !jetpackHeld) {
+          this.isFlying = false;
+          this.flyTimer = 0;
+          this.audio.stopJetpack();
+        }
       } else {
         this.isGrounded = false;
       }
@@ -617,8 +653,14 @@ export class CharacterController {
       (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.6 - heightAboveGround * 0.1, 0.1, 0.6);
     }
 
-    // 5. Animation State Machine
-    if (!this.isGrounded) {
+    // 5. Animation State Machine (Idle -> Walk/Run, Jump -> Fall, Jetpack -> Idle float -> Fly)
+    if (this.isFlying) {
+      if (this.flyTimer < 0.42 && !isMoving && !this.wasInAir) {
+        this.state = CharacterState.IDLE;
+      } else {
+        this.state = CharacterState.FLY;
+      }
+    } else if (!this.isGrounded) {
       this.state = this.velocity.y > 0 ? CharacterState.JUMP : CharacterState.FALL;
     } else if (isMoving) {
       this.state = isRunning ? CharacterState.RUN : CharacterState.WALK;
@@ -629,7 +671,7 @@ export class CharacterController {
     // Update GLB Mixer or Procedural Limb Animations
     if (this.mixer) {
       this.mixer.update(dt);
-      const fadeDuration = this.state === CharacterState.JUMP ? 0.08 : 0.15;
+      const fadeDuration = this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15);
       this.playAnimation(this.state, fadeDuration);
       if (this.currentAction) {
         if (this.state === CharacterState.RUN) {
@@ -638,6 +680,8 @@ export class CharacterController {
         } else if (this.state === CharacterState.WALK) {
           // Dynamic stride match for walking: 1.25 m/s base gives perfect foot placement with 0 sliding
           this.currentAction.timeScale = Math.max(0.6, horizontalSpeed / 1.25);
+        } else if (this.state === CharacterState.FLY) {
+          this.currentAction.timeScale = 1.0;
         } else if (this.state === CharacterState.JUMP || this.state === CharacterState.FALL) {
           this.currentAction.timeScale = 1.25; // Snappy jump arc
         } else {

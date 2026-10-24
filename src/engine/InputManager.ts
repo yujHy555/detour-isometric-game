@@ -22,6 +22,8 @@ export class InputManager {
   public isRunning: boolean = false;
   public jumpJustPressed: boolean = false;
   public actionJustPressed: boolean = false;
+  public isJetpackHeld: boolean = false;
+  public isMobile: boolean = false;
 
   public lastInputType: 'keyboard' | 'gamepad' | 'touch' = 'keyboard';
   public gamepadState: GamepadUIState = {
@@ -48,6 +50,7 @@ export class InputManager {
   private touchStartPos: { x: number; y: number } = { x: 0, y: 0 };
   private touchMoveVector: { x: number; y: number } = { x: 0, y: 0 };
   private touchSprintActive: boolean = false;
+  private touchJetpackActive: boolean = false;
 
   // 45° angle offset for isometric camera alignment
   private readonly isoAngle = -Math.PI / 4;
@@ -111,9 +114,9 @@ export class InputManager {
   }
 
   private setupTouchControls() {
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && window.innerWidth <= 1024;
     const mobileUI = document.getElementById('mobile-controls');
-    if (mobileUI && isMobile) {
+    if (mobileUI && this.isMobile) {
       mobileUI.style.display = 'flex';
       this.lastInputType = 'touch';
     }
@@ -123,6 +126,7 @@ export class InputManager {
     const btnJump = document.getElementById('btn-touch-jump');
     const btnSprint = document.getElementById('btn-touch-sprint');
     const btnAct = document.getElementById('btn-touch-action');
+    const btnJetpack = document.getElementById('btn-touch-jetpack');
 
     if (joystickZone && joystickKnob) {
       joystickZone.addEventListener('touchstart', (e) => {
@@ -177,6 +181,23 @@ export class InputManager {
         this.actionJustPressed = true;
       });
     }
+
+    if (btnJetpack) {
+      btnJetpack.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this.lastInputType = 'touch';
+        this.touchJetpackActive = true;
+        btnJetpack.classList.add('active');
+      });
+
+      const stopJet = (e: TouchEvent) => {
+        e.preventDefault();
+        this.touchJetpackActive = false;
+        btnJetpack.classList.remove('active');
+      };
+      btnJetpack.addEventListener('touchend', stopJet);
+      btnJetpack.addEventListener('touchcancel', stopJet);
+    }
   }
 
   private handleJoystickMove(clientX: number, clientY: number, knob: HTMLElement) {
@@ -228,103 +249,115 @@ export class InputManager {
       screenZ = this.touchMoveVector.y;
     }
 
-    // 3. Gamepad Input Polling
-    const gamepads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
-    let gpFound = false;
+    // 3. Gamepad Input Polling (Strictly disabled on mobile devices)
+    let gpJetpack = false;
+    if (!this.isMobile) {
+      const gamepads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
+      let gpFound = false;
 
-    for (const gp of gamepads) {
-      if (!gp || !gp.connected) continue;
-      gpFound = true;
-      this.gamepadState.connected = true;
-      this.gamepadState.name = gp.id || 'Standard Gamepad';
+      for (const gp of gamepads) {
+        if (!gp || !gp.connected) continue;
+        gpFound = true;
+        this.gamepadState.connected = true;
+        this.gamepadState.name = gp.id || 'Standard Gamepad';
 
-      // Left Analog Stick (Axes 0, 1)
-      const deadzone = 0.16;
-      let lx = gp.axes[0] || 0;
-      let ly = gp.axes[1] || 0;
+        // Left Analog Stick (Axes 0, 1)
+        const deadzone = 0.16;
+        let lx = gp.axes[0] || 0;
+        let ly = gp.axes[1] || 0;
 
-      if (Math.abs(lx) < deadzone) lx = 0;
-      if (Math.abs(ly) < deadzone) ly = 0;
+        if (Math.abs(lx) < deadzone) lx = 0;
+        if (Math.abs(ly) < deadzone) ly = 0;
 
-      this.gamepadState.stickL.x = lx;
-      this.gamepadState.stickL.y = ly;
+        this.gamepadState.stickL.x = lx;
+        this.gamepadState.stickL.y = ly;
 
-      // Right Analog Stick (Axes 2, 3)
-      let rx = gp.axes[2] || 0;
-      let ry = gp.axes[3] || 0;
-      if (Math.abs(rx) < deadzone) rx = 0;
-      if (Math.abs(ry) < deadzone) ry = 0;
+        // Right Analog Stick (Axes 2, 3)
+        let rx = gp.axes[2] || 0;
+        let ry = gp.axes[3] || 0;
+        if (Math.abs(rx) < deadzone) rx = 0;
+        if (Math.abs(ry) < deadzone) ry = 0;
 
-      this.gamepadState.stickR.x = rx;
-      this.gamepadState.stickR.y = ry;
+        this.gamepadState.stickR.x = rx;
+        this.gamepadState.stickR.y = ry;
 
-      // D-Pad buttons (12: Up, 13: Down, 14: Left, 15: Right)
-      let dpadX = 0;
-      let dpadZ = 0;
-      if (gp.buttons[14]?.pressed) dpadX -= 1;
-      if (gp.buttons[15]?.pressed) dpadX += 1;
-      if (gp.buttons[12]?.pressed) dpadZ -= 1;
-      if (gp.buttons[13]?.pressed) dpadZ += 1;
+        // D-Pad buttons (12: Up, 13: Down, 14: Left, 15: Right)
+        let dpadX = 0;
+        let dpadZ = 0;
+        if (gp.buttons[14]?.pressed) dpadX -= 1;
+        if (gp.buttons[15]?.pressed) dpadX += 1;
+        if (gp.buttons[12]?.pressed) dpadZ -= 1;
+        if (gp.buttons[13]?.pressed) dpadZ += 1;
 
-      // Blend stick or D-pad
-      if (Math.hypot(lx, ly) > 0.1) {
-        screenX = lx;
-        screenZ = ly;
-        this.lastInputType = 'gamepad';
-      } else if (Math.hypot(dpadX, dpadZ) > 0.1) {
-        screenX = dpadX;
-        screenZ = dpadZ;
-        this.lastInputType = 'gamepad';
+        // Blend stick or D-pad
+        if (Math.hypot(lx, ly) > 0.1) {
+          screenX = lx;
+          screenZ = ly;
+          this.lastInputType = 'gamepad';
+        } else if (Math.hypot(dpadX, dpadZ) > 0.1) {
+          screenX = dpadX;
+          screenZ = dpadZ;
+          this.lastInputType = 'gamepad';
+        }
+
+        // Buttons
+        // A (0): Jump / Jetpack Hold
+        const btnAJump = !!gp.buttons[0]?.pressed;
+        this.gamepadState.btnA = btnAJump;
+        if (btnAJump && !this.prevGamepadJump) {
+          this.jumpJustPressed = true;
+          this.lastInputType = 'gamepad';
+        }
+        this.prevGamepadJump = btnAJump;
+
+        // B (1) or L3 (10) or RT (7) or RB (5): Sprint
+        const gpSprint = !!(
+          gp.buttons[1]?.pressed ||
+          gp.buttons[10]?.pressed ||
+          gp.buttons[7]?.pressed ||
+          gp.buttons[5]?.pressed
+        );
+        this.gamepadState.btnB = !!gp.buttons[1]?.pressed;
+        this.gamepadState.triggerR = !!(gp.buttons[7]?.pressed || gp.buttons[5]?.pressed);
+        this.gamepadState.triggerL = !!(gp.buttons[6]?.pressed || gp.buttons[4]?.pressed);
+        if (gpSprint) sprintPressed = true;
+
+        // X (2): Action
+        const btnXAct = !!gp.buttons[2]?.pressed;
+        this.gamepadState.btnX = btnXAct;
+        if (btnXAct && !this.prevGamepadAction) {
+          this.actionJustPressed = true;
+          this.lastInputType = 'gamepad';
+        }
+        this.prevGamepadAction = btnXAct;
+
+        // Y (3) or LB (4): Jetpack thrust
+        this.gamepadState.btnY = !!gp.buttons[3]?.pressed;
+        if (gp.buttons[3]?.pressed || gp.buttons[4]?.pressed) {
+          gpJetpack = true;
+        }
+
+        // Right stick aim if engaged
+        if (Math.hypot(rx, ry) > 0.3) {
+          this.isAiming = true;
+          this.lastInputType = 'gamepad';
+        } else if (this.lastInputType === 'gamepad') {
+          this.isAiming = false;
+        }
+
+        break; // Primary gamepad active
       }
 
-      // Buttons
-      // A (0): Jump
-      const btnAJump = !!gp.buttons[0]?.pressed;
-      this.gamepadState.btnA = btnAJump;
-      if (btnAJump && !this.prevGamepadJump) {
-        this.jumpJustPressed = true;
-        this.lastInputType = 'gamepad';
+      if (!gpFound && this.gamepadState.connected) {
+        this.gamepadState.connected = false;
       }
-      this.prevGamepadJump = btnAJump;
-
-      // B (1) or L3 (10) or RT (7) or RB (5): Sprint
-      const gpSprint = !!(
-        gp.buttons[1]?.pressed ||
-        gp.buttons[10]?.pressed ||
-        gp.buttons[7]?.pressed ||
-        gp.buttons[5]?.pressed
-      );
-      this.gamepadState.btnB = !!gp.buttons[1]?.pressed;
-      this.gamepadState.triggerR = !!(gp.buttons[7]?.pressed || gp.buttons[5]?.pressed);
-      this.gamepadState.triggerL = !!(gp.buttons[6]?.pressed || gp.buttons[4]?.pressed);
-      if (gpSprint) sprintPressed = true;
-
-      // X (2): Action
-      const btnXAct = !!gp.buttons[2]?.pressed;
-      this.gamepadState.btnX = btnXAct;
-      if (btnXAct && !this.prevGamepadAction) {
-        this.actionJustPressed = true;
-        this.lastInputType = 'gamepad';
-      }
-      this.prevGamepadAction = btnXAct;
-
-      // Y (3)
-      this.gamepadState.btnY = !!gp.buttons[3]?.pressed;
-
-      // Right stick aim if engaged
-      if (Math.hypot(rx, ry) > 0.3) {
-        this.isAiming = true;
-        this.lastInputType = 'gamepad';
-      } else if (this.lastInputType === 'gamepad') {
-        this.isAiming = false;
-      }
-
-      break; // Primary gamepad active
-    }
-
-    if (!gpFound && this.gamepadState.connected) {
+    } else {
       this.gamepadState.connected = false;
     }
+
+    // Jetpack Input (Keyboard F / E / Hold Space, Touch Jet button, or Gamepad Y / LB)
+    const kbJetpack = !!(this.keys['KeyF'] || this.keys['KeyE'] || this.keys['Space']);
+    this.isJetpackHeld = kbJetpack || this.touchJetpackActive || gpJetpack;
 
     this.moveVector.set(screenX, 0, screenZ);
     if (this.moveVector.lengthSq() > 1.0) {
