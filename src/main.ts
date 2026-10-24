@@ -555,27 +555,6 @@ class DetourGame {
     this.updateMenuParticles(dt);
     this.updateGamepadHUD();
 
-    // Update Holographic Crosshair tracking Mouse / Gamepad Right Toggle
-    const crosshairEl = document.getElementById('crosshair');
-    if (crosshairEl) {
-      if (this.character.hasGun && this.rayGun.isGunCollected) {
-        if (crosshairEl.style.display !== 'block') {
-          crosshairEl.style.display = 'block';
-        }
-        crosshairEl.style.left = `${this.inputManager.getMouseScreenX().toFixed(1)}px`;
-        crosshairEl.style.top = `${this.inputManager.getMouseScreenY().toFixed(1)}px`;
-        if (this.inputManager.isAiming) {
-          crosshairEl.classList.add('aiming');
-        } else {
-          crosshairEl.classList.remove('aiming');
-        }
-      } else {
-        if (crosshairEl.style.display !== 'none') {
-          crosshairEl.style.display = 'none';
-        }
-      }
-    }
-
     // 3. Update Character Physics & Animation
     this.character.update(
       dt,
@@ -595,9 +574,9 @@ class DetourGame {
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
 
-    // 4. Ray Gun Shooting System (Fires on deliberate click or held fire with cooldown, never on pickup!)
+    // 4. Ray Gun Shooting System (Fires straight in player facing direction, triggers shooting animation)
     if (this.character.hasGun && (this.inputManager.consumeShoot() || this.inputManager.isShootingHeld)) {
-      this.rayGun.shoot(this.inputManager.mouseWorldTarget);
+      this.rayGun.shoot();
     }
     this.rayGun.update(dt);
 

@@ -8,7 +8,8 @@ export enum CharacterState {
   RUN = 'run',
   JUMP = 'jump',
   FALL = 'fall',
-  FLY = 'fly'
+  FLY = 'fly',
+  SHOOT = 'shoot'
 }
 
 export class CharacterController {
@@ -234,7 +235,7 @@ export class CharacterController {
             for (const clip of gltf.animations) {
               const name = clip.name.toLowerCase();
               const action = this.mixer.clipAction(clip);
-              if (name.includes('jump')) {
+              if (name.includes('jump') || name.includes('shoot')) {
                 action.loop = THREE.LoopOnce;
                 action.clampWhenFinished = true;
               }
@@ -504,14 +505,15 @@ export class CharacterController {
 
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
+    this.state = CharacterState.SHOOT;
     const shootAction = this.findAction('shoot');
     if (shootAction) {
       if (this.currentAction && this.currentAction !== shootAction) {
-        this.currentAction.fadeOut(0.06);
+        this.currentAction.fadeOut(0.04);
       }
       shootAction.reset();
-      shootAction.setLoop(THREE.LoopOnce, 1);
-      shootAction.clampWhenFinished = true;
+      shootAction.setEffectiveTimeScale(1.0);
+      shootAction.setEffectiveWeight(1.0);
       shootAction.fadeIn(0.04).play();
       this.currentAction = shootAction;
     }
@@ -576,8 +578,8 @@ export class CharacterController {
     isRunning: boolean,
     jumpPressed: boolean,
     jetpackHeld: boolean,
-    aimTarget: THREE.Vector3,
-    isAiming: boolean,
+    _aimTarget: THREE.Vector3,
+    _isAiming: boolean,
     getTerrainHeight: (x: number, z: number, fromY?: number) => number,
     resolveCollision?: (pos: THREE.Vector3, radius: number) => THREE.Vector3,
     resolveCeiling?: (pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight?: number) => void,
@@ -616,8 +618,8 @@ export class CharacterController {
       this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveVector.x * currentSpeed, dt * 25.0);
       this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveVector.z * currentSpeed, dt * 25.0);
 
-      // Rotate toward WASD movement direction (or aim target if actively aiming)
-      const lookDir = isAiming ? aimTarget.clone().sub(this.position) : moveVector;
+      // Rotate toward movement direction (character faces the direction they are walking)
+      const lookDir = moveVector;
       lookDir.y = 0;
       if (lookDir.lengthSq() > 0.001) {
         const targetRot = Math.atan2(lookDir.x, lookDir.z);
@@ -634,19 +636,6 @@ export class CharacterController {
       this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, 0, dt * 45.0);
       if (Math.abs(this.velocity.x) < 0.06) this.velocity.x = 0;
       if (Math.abs(this.velocity.z) < 0.06) this.velocity.z = 0;
-
-      // Allow aiming while stationary if right-click is held
-      if (isAiming) {
-        const lookDir = aimTarget.clone().sub(this.position);
-        lookDir.y = 0;
-        if (lookDir.lengthSq() > 0.001) {
-          const targetRot = Math.atan2(lookDir.x, lookDir.z);
-          let diff = targetRot - this.group.rotation.y;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          this.group.rotation.y += diff * Math.min(1.0, dt * 18.0);
-        }
-      }
     }
 
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
@@ -869,8 +858,11 @@ export class CharacterController {
       (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.65 - heightAboveGround * 0.1, 0.1, 0.65);
     }
 
-    // 5. Animation State Machine (Idle -> Walk/Run, Jump -> Fall, Jetpack -> Idle float -> Fly)
-    if (this.isFlying) {
+    // 5. Animation State Machine (Shoot priority -> Jetpack -> Jump/Fall -> Walk/Run -> Idle)
+    if (this.shootAnimTimer > 0) {
+      this.shootAnimTimer -= dt;
+      this.state = CharacterState.SHOOT;
+    } else if (this.isFlying) {
       if (this.flyTimer < 0.42 && !isMoving && !this.wasInAir) {
         this.state = CharacterState.IDLE;
       } else {
@@ -885,20 +877,14 @@ export class CharacterController {
     }
 
     // Update GLB Mixer Animations
-    if (this.shootAnimTimer > 0) {
-      this.shootAnimTimer -= dt;
-    }
-
     if (this.mixer) {
       this.mixer.update(dt);
-      const fadeDuration = this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15);
-      if (this.shootAnimTimer > 0 && this.state !== CharacterState.JUMP && this.state !== CharacterState.FLY) {
-        // Let shoot animation finish with punchy recoil
-      } else {
-        this.playAnimation(this.state, fadeDuration);
-      }
+      const fadeDuration = this.state === CharacterState.SHOOT ? 0.04 : (this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15));
+      this.playAnimation(this.state, fadeDuration);
       if (this.currentAction) {
-        if (this.state === CharacterState.RUN) {
+        if (this.state === CharacterState.SHOOT) {
+          this.currentAction.timeScale = 1.0;
+        } else if (this.state === CharacterState.RUN) {
           // Dynamic stride match for running: 4.6 m/s base gives perfect foot placement with 0 sliding
           this.currentAction.timeScale = Math.max(0.7, horizontalSpeed / 4.6);
         } else if (this.state === CharacterState.WALK) {

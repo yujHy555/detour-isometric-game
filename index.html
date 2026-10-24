@@ -696,89 +696,7 @@
       letter-spacing: 1px;
     }
 
-    /* Holographic Crosshair HUD */
-    .crosshair-hud {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      width: 44px;
-      height: 44px;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      z-index: 100;
-      display: none;
-      transition: transform 0.06s ease-out;
-    }
-    .ch-reticle {
-      position: relative;
-      width: 100%;
-      height: 100%;
-    }
-    .ch-ring {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 24px;
-      height: 24px;
-      transform: translate(-50%, -50%);
-      border: 1.5px dashed rgba(0, 240, 255, 0.75);
-      border-radius: 50%;
-      animation: chSpin 8s linear infinite;
-    }
-    @keyframes chSpin {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
-    }
-    .ch-dot {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 4px;
-      height: 4px;
-      transform: translate(-50%, -50%);
-      background: #00f0ff;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #00f0ff, 0 0 16px #38bdf8;
-    }
-    .ch-tick {
-      position: absolute;
-      background: rgba(56, 189, 248, 0.85);
-      box-shadow: 0 0 6px #00f0ff;
-    }
-    .ch-t { top: 0; left: 50%; width: 2px; height: 6px; transform: translateX(-50%); }
-    .ch-b { bottom: 0; left: 50%; width: 2px; height: 6px; transform: translateX(-50%); }
-    .ch-l { left: 0; top: 50%; width: 6px; height: 2px; transform: translateY(-50%); }
-    .ch-r { right: 0; top: 50%; width: 6px; height: 2px; transform: translateY(-50%); }
-    .ch-bracket {
-      position: absolute;
-      width: 6px;
-      height: 6px;
-      border-color: rgba(0, 240, 255, 0.9);
-      border-style: solid;
-      filter: drop-shadow(0 0 4px #00f0ff);
-    }
-    .ch-tl { top: 3px; left: 3px; border-width: 1.5px 0 0 1.5px; }
-    .ch-tr { top: 3px; right: 3px; border-width: 1.5px 1.5px 0 0; }
-    .ch-bl { bottom: 3px; left: 3px; border-width: 0 0 1.5px 1.5px; }
-    .ch-br { bottom: 3px; right: 3px; border-width: 0 1.5px 1.5px 0; }
 
-    .crosshair-hud.aiming .ch-ring {
-      border: 1.5px solid #00f0ff;
-      box-shadow: 0 0 12px rgba(0, 240, 255, 0.85), inset 0 0 8px rgba(56, 189, 248, 0.5);
-      animation: none;
-      transform: translate(-50%, -50%) scale(0.85);
-    }
-    .crosshair-hud.aiming .ch-bracket {
-      border-color: #38bdf8;
-    }
-
-    .crosshair-hud.firing {
-      animation: chKick 0.12s ease-out;
-    }
-    @keyframes chKick {
-      0% { transform: translate(-50%, -50%) scale(1.4); filter: brightness(2.0); }
-      100% { transform: translate(-50%, -50%) scale(1.0); filter: brightness(1.0); }
-    }
     .slot-qty {
       position: absolute;
       bottom: 2px;
@@ -1527,21 +1445,7 @@
     <div class="upgrade-banner-desc">SPEED: +65% • MANEUVERABILITY: ULTRA RESPONSIVE • EFFICIENCY: +40%</div>
   </div>
 
-  <!-- Sci-Fi Dynamic Holographic Crosshair -->
-  <div id="crosshair" class="crosshair-hud">
-    <div class="ch-reticle">
-      <div class="ch-ring"></div>
-      <div class="ch-dot"></div>
-      <div class="ch-tick ch-t"></div>
-      <div class="ch-tick ch-b"></div>
-      <div class="ch-tick ch-l"></div>
-      <div class="ch-tick ch-r"></div>
-      <div class="ch-bracket ch-tl"></div>
-      <div class="ch-bracket ch-tr"></div>
-      <div class="ch-bracket ch-bl"></div>
-      <div class="ch-bracket ch-br"></div>
-    </div>
-  </div>
+
 
   <!-- Mobile Controls (Virtual Sticks & Buttons) -->
   <div id="mobile-controls">

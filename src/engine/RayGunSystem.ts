@@ -52,7 +52,7 @@ export class RayGunSystem {
 
   // Firing mechanics
   private cooldown: number = 0;
-  private readonly fireRate: number = 0.18; // ~5.5 rounds/sec, snappy semi-auto
+  private readonly fireRate: number = 0.35; // Matches duration of shoot animation
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
 
   // Active VFX Pools
@@ -399,53 +399,38 @@ export class RayGunSystem {
   }
 
   /**
-   * Fires a high-energy plasma ray from the gun muzzle toward the aimed world target
+   * Fires a high-energy plasma ray from the gun muzzle straight in the direction the player is standing
    */
-  public shoot(aimWorldTarget: THREE.Vector3): boolean {
+  public shoot(): boolean {
     if (!this.character.hasGun || this.cooldown > 0) return false;
 
     this.cooldown = this.fireRate;
 
-    // 1. Turn character to face aim target precisely
-    const dx = aimWorldTarget.x - this.character.position.x;
-    const dz = aimWorldTarget.z - this.character.position.z;
-    if (dx * dx + dz * dz > 0.001) {
-      this.character.group.rotation.y = Math.atan2(dx, dz);
-      this.character.group.updateMatrixWorld(true);
-    }
-
-    // 2. Play shooting animation with full upper-body priority
+    // 1. Play shooting animation with full upper-body priority
     this.character.playShootAnimation();
     this.character.group.updateMatrixWorld(true);
 
-    // 3. Obtain exact physical barrel muzzle position in world space
+    // 2. The straight forward direction the player is standing in:
+    const rotY = this.character.group.rotation.y;
+    const forwardDir = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)).normalize();
+    const aimDir = forwardDir;
+
+    // 3. Obtain exact physical barrel muzzle position at the tip of the barrel in world space
     const muzzlePos = this.character.getMuzzlePosition();
 
-    // 4. Ray shoots in a straight angle from the end of the barrel toward the crosshair
-    const target = aimWorldTarget.clone();
-    const aimDir = target.sub(muzzlePos).normalize();
+    // 4. Physical recoil impulse pushes character slightly backward opposite to facing direction
+    this.character.velocity.addScaledVector(forwardDir, -0.65);
 
-    // Apply tactile physics recoil to character
-    this.character.velocity.addScaledVector(aimDir, -0.65);
-
-    // Trigger visual crosshair kick in UI
-    const crosshairEl = document.getElementById('crosshair');
-    if (crosshairEl) {
-      crosshairEl.classList.remove('firing');
-      void crosshairEl.offsetWidth;
-      crosshairEl.classList.add('firing');
-    }
-
-    // 3. Audio Firing Sound
+    // 5. Audio Firing Sound
     try {
       this.audio.playRayGunShot();
     } catch {
       // Audio fallback
     }
 
-    // 4. Raycast against World Colliders (Floor, Boxes, Platforms, Ramps) & Alien Plants
-    this.raycaster.set(muzzlePos, aimDir);
-    this.raycaster.far = 55.0;
+    // 6. Ray shoots straight forward from the barrel tip in the direction the player is standing
+    this.raycaster.set(muzzlePos, forwardDir);
+    this.raycaster.far = 60.0;
 
     const colliders: THREE.Object3D[] = [...this.world.terrainColliders, this.plants.getGroup()];
     const hits = this.raycaster.intersectObjects(colliders, true);
