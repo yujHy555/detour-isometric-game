@@ -450,7 +450,11 @@ class DetourGame {
       this.inputManager.mouseWorldTarget,
       this.inputManager.isAiming,
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
-      (pos, radius) => this.world.resolveHorizontalCollision(pos, radius),
+      (pos, radius) => {
+        this.world.resolveHorizontalCollision(pos, radius);
+        this.plants.resolveCollisions(pos, radius);
+        return pos;
+      },
       (pos, vel, h) => this.world.resolveCeilingCollision(pos, vel, h),
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );

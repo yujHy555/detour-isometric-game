@@ -8,10 +8,19 @@ export interface PlantSpawnDef {
   scaleMax?: number;
 }
 
+export interface PlantCollider {
+  x: number;
+  z: number;
+  y: number;
+  radius: number;
+  height: number;
+}
+
 export class PlantManager {
   private scene: THREE.Scene;
   private group: THREE.Group;
   private plants: THREE.Group[] = [];
+  private colliders: PlantCollider[] = [];
   public isLoaded: boolean = false;
 
   constructor(
@@ -104,6 +113,17 @@ export class PlantManager {
 
           this.group.add(plant);
           this.plants.push(plant);
+
+          // Register solid cylinder collision for the plant's stem & trunk
+          const trunkRadius = Math.max(0.18, 0.28 * baseScale);
+          const plantHeight = 2.17 * sy;
+          this.colliders.push({
+            x: pt.x,
+            z: pt.z,
+            y: groundY,
+            radius: trunkRadius,
+            height: plantHeight
+          });
         }
 
         this.isLoaded = true;
@@ -113,6 +133,32 @@ export class PlantManager {
         console.error('[PlantManager] Failed to load alien_red_plants_01.glb:', err);
       }
     );
+  }
+
+  /**
+   * Solid capsule/cylinder collision solver for all scattered plants.
+   * Player cannot walk through plants, while jumping/flying over them passes freely.
+   */
+  public resolveCollisions(pos: THREE.Vector3, characterRadius: number = 0.35): THREE.Vector3 {
+    if (!this.isLoaded || this.colliders.length === 0) return pos;
+
+    for (const c of this.colliders) {
+      // Check height range: blocks when player is in vertical range of the plant trunk
+      if (pos.y >= c.y - 0.25 && pos.y < c.y + c.height) {
+        const dx = pos.x - c.x;
+        const dz = pos.z - c.z;
+        const distSq = dx * dx + dz * dz;
+        const minDist = characterRadius + c.radius;
+
+        if (distSq < minDist * minDist && distSq > 0.000001) {
+          const dist = Math.sqrt(distSq);
+          const overlap = minDist - dist;
+          pos.x += (dx / dist) * overlap;
+          pos.z += (dz / dist) * overlap;
+        }
+      }
+    }
+    return pos;
   }
 
   /**
