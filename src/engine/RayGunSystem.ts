@@ -147,7 +147,7 @@ export class RayGunSystem {
 
     this.ringGeo = new THREE.RingGeometry(0.05, 0.18, 20);
     this.ringMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0x0066ff,
       transparent: true,
       opacity: 0.9,
       side: THREE.DoubleSide,
@@ -155,19 +155,19 @@ export class RayGunSystem {
       depthWrite: false
     });
 
-    // Muzzle flash point light
-    this.muzzleLight = new THREE.PointLight(0x00f0ff, 0, 7.0);
+    // Muzzle flash point light (vivid electric blue)
+    this.muzzleLight = new THREE.PointLight(0x0066ff, 0, 7.5);
     this.scene.add(this.muzzleLight);
 
-    // Procedural Soft Glowing Plasma Flare Texture
+    // Procedural Soft Glowing Blue Plasma Flare Texture
     const canvas = document.createElement('canvas');
     canvas.width = 128;
     canvas.height = 128;
     const ctx = canvas.getContext('2d')!;
     const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
-    grad.addColorStop(0.2, 'rgba(0, 240, 255, 0.9)');
-    grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
+    grad.addColorStop(0.0, 'rgba(235, 245, 255, 1.0)');
+    grad.addColorStop(0.22, 'rgba(37, 99, 235, 0.95)');
+    grad.addColorStop(0.55, 'rgba(0, 85, 255, 0.55)');
     grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 128, 128);
@@ -187,9 +187,9 @@ export class RayGunSystem {
     sprite.scale.set(0.48, 0.48, 0.48);
     this.muzzleFlashGroup.add(sprite);
 
-    // 2. High-intensity 3D volumetric core sphere (pure white radiant plasma)
+    // 2. High-intensity 3D volumetric core sphere (luminous blue-white plasma)
     this.muzzleCoreMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      color: 0xdbeafe,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
@@ -199,9 +199,9 @@ export class RayGunSystem {
     const core = new THREE.Mesh(coreGeo, this.muzzleCoreMat);
     this.muzzleFlashGroup.add(core);
 
-    // 3. Volumetric cyan plasma corona sphere
+    // 3. Volumetric electric blue plasma corona sphere
     this.muzzleCoronaMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0x0066ff,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
@@ -634,12 +634,12 @@ export class RayGunSystem {
 
     const beamGroup = new THREE.Group();
 
-    // Core beam (radiant white)
-    const coreGeo = new THREE.CylinderGeometry(0.028, 0.028, dist, 8);
+    // Core beam (luminous electric ice-blue)
+    const coreGeo = new THREE.CylinderGeometry(0.032, 0.032, dist, 8);
     coreGeo.translate(0, dist / 2, 0);
     coreGeo.rotateX(Math.PI / 2);
     const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      color: 0x93c5fd,
       transparent: true,
       opacity: 1.0,
       blending: THREE.AdditiveBlending
@@ -647,14 +647,14 @@ export class RayGunSystem {
     const coreMesh = new THREE.Mesh(coreGeo, coreMat);
     beamGroup.add(coreMesh);
 
-    // Outer volumetric bloom sleeve (electric cyan)
-    const glowGeo = new THREE.CylinderGeometry(0.075, 0.075, dist, 10);
+    // Outer volumetric bloom sleeve (vibrant electric deep blue)
+    const glowGeo = new THREE.CylinderGeometry(0.095, 0.095, dist, 10);
     glowGeo.translate(0, dist / 2, 0);
     glowGeo.rotateX(Math.PI / 2);
     const glowMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0x0055ff,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.92,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -751,9 +751,9 @@ export class RayGunSystem {
   private spawnScorchMark(hitPos: THREE.Vector3, hitNormal: THREE.Vector3) {
     const scorchGeo = new THREE.CircleGeometry(0.14, 12);
     const scorchMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0x0066ff,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.85,
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -1.0,
@@ -936,14 +936,14 @@ export class RayGunSystem {
     this.laserGuideGroup.visible = false;
     this.scene.add(this.laserGuideGroup);
 
-    // 1. Thin glowing laser beam line (unit length cylinder oriented along +Z)
-    const lineGeo = new THREE.CylinderGeometry(0.007, 0.007, 1.0, 6);
+    // 1. Glowing electric blue laser beam line (unit length cylinder oriented along +Z, enhanced thickness)
+    const lineGeo = new THREE.CylinderGeometry(0.012, 0.012, 1.0, 8);
     lineGeo.translate(0, 0.5, 0);
     lineGeo.rotateX(Math.PI / 2);
     this.laserLineMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0x2563eb,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.52,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -951,11 +951,11 @@ export class RayGunSystem {
     this.laserGuideGroup.add(this.laserLineMesh);
 
     // 2. Glowing target dot at hit point
-    const dotGeo = new THREE.SphereGeometry(0.045, 12, 12);
+    const dotGeo = new THREE.SphereGeometry(0.05, 12, 12);
     this.laserDotMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
+      color: 0x38bdf8,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.90,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -963,7 +963,7 @@ export class RayGunSystem {
     this.laserGuideGroup.add(this.laserDotMesh);
 
     // 3. Lock-on pulsing target ring
-    const ringGeo = new THREE.RingGeometry(0.12, 0.22, 18);
+    const ringGeo = new THREE.RingGeometry(0.14, 0.25, 20);
     this.laserRingMat = new THREE.MeshBasicMaterial({
       color: 0xfacc15,
       transparent: true,
@@ -977,8 +977,43 @@ export class RayGunSystem {
   }
 
   /**
+   * Resolves physical cylinder-sphere collision so character cannot walk or fly through active target spheres
+   */
+  public resolveCharacterCollision(pos: THREE.Vector3, radius: number = 0.35): void {
+    const charHeight = 1.85;
+    for (const target of this.targets) {
+      if (!target.isAlive) continue;
+
+      const tPos = target.mesh.position;
+      const tRadius = 0.45;
+
+      // Vertical overlap check between character vertical cylinder and target sphere
+      if (pos.y + charHeight < tPos.y - tRadius || pos.y > tPos.y + tRadius) {
+        continue;
+      }
+
+      // Horizontal circular collision resolution
+      const dx = pos.x - tPos.x;
+      const dz = pos.z - tPos.z;
+      const distSq = dx * dx + dz * dz;
+      const minDist = radius + tRadius;
+
+      if (distSq < minDist * minDist) {
+        if (distSq > 0.0001) {
+          const dist = Math.sqrt(distSq);
+          const overlap = minDist - dist;
+          pos.x += (dx / dist) * overlap;
+          pos.z += (dz / dist) * overlap;
+        } else {
+          pos.x += minDist;
+        }
+      }
+    }
+  }
+
+  /**
    * Evaluates all alive target spheres for Soft Aim Magnetism and Generous Hit Radius.
-   * If a target is within the magnetic forward cone (16 deg) or generous hit radius (1.6m),
+   * If a target is within the magnetic forward cone (28 deg) or generous hit radius (2.8m),
    * returns the target and the snapped direction directly toward it.
    */
   private findBestMagnetizedTarget(muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): { target: TargetSphere; direction: THREE.Vector3 } | null {
@@ -986,9 +1021,9 @@ export class RayGunSystem {
     let bestScore = Infinity; // Lower score = better target
     let bestDir = new THREE.Vector3();
 
-    const maxAimDistance = 50.0;
-    const maxPerpDistance = 1.6; // Generous hit radius in meters
-    const maxConeAngleRad = 16.0 * (Math.PI / 180); // 16 degree forward cone
+    const maxAimDistance = 55.0;
+    const maxPerpDistance = 2.8; // Generous hit radius in meters
+    const maxConeAngleRad = 28.0 * (Math.PI / 180); // 28 degree wide forward cone
 
     for (const target of this.targets) {
       if (!target.isAlive) continue;
@@ -998,7 +1033,7 @@ export class RayGunSystem {
       const projDist = toTarget.dot(aimDir);
 
       // Must be in front of the player and within range
-      if (projDist < 0.6 || projDist > maxAimDistance) continue;
+      if (projDist < 0.25 || projDist > maxAimDistance) continue;
 
       const closestPoint = muzzlePos.clone().addScaledVector(aimDir, projDist);
       const perpDist = closestPoint.distanceTo(targetPos);
@@ -1007,11 +1042,11 @@ export class RayGunSystem {
 
       // Check generous hit radius OR magnetic angular cone
       const isWithinHitRadius = perpDist <= maxPerpDistance;
-      const isWithinMagnetCone = angleRad <= maxConeAngleRad && perpDist <= (maxPerpDistance + projDist * 0.12);
+      const isWithinMagnetCone = angleRad <= maxConeAngleRad && perpDist <= (maxPerpDistance + projDist * 0.22);
 
       if (isWithinHitRadius || isWithinMagnetCone) {
         // Prioritize targets closest to the center line
-        const score = angleRad * 2.5 + perpDist * 0.6 + projDist * 0.04;
+        const score = angleRad * 2.0 + perpDist * 0.5 + projDist * 0.03;
         if (score < bestScore) {
           bestScore = score;
           bestTarget = target;
@@ -1047,7 +1082,7 @@ export class RayGunSystem {
     const aliveTargets = this.targets.filter(t => t.isAlive).map(t => t.mesh);
     const colliders = [...this.world.terrainColliders, this.plants.getGroup(), ...aliveTargets];
     this.raycaster.set(muzzlePos, aimDir);
-    this.raycaster.far = 45.0;
+    this.raycaster.far = 50.0;
     const hits = this.raycaster.intersectObjects(colliders, true);
 
     let endPoint: THREE.Vector3;
@@ -1074,7 +1109,7 @@ export class RayGunSystem {
     if (this.isTargetLocked) {
       // Vibrant amber/gold lock-on
       this.laserLineMat.color.setHex(0xfacc15);
-      this.laserLineMat.opacity = 0.55;
+      this.laserLineMat.opacity = 0.65;
       this.laserDotMat.color.setHex(0xfacc15);
       this.laserDotMesh.scale.setScalar(1.5);
 
@@ -1087,11 +1122,11 @@ export class RayGunSystem {
       this.laserRingMat.opacity = 0.85;
       this.laserLockRing.rotation.z += dt * 3.5;
     } else {
-      // Faint cyber cyan guide
-      this.laserLineMat.color.setHex(0x00f0ff);
-      this.laserLineMat.opacity = 0.32;
-      this.laserDotMat.color.setHex(0x00f0ff);
-      this.laserDotMesh.scale.setScalar(1.0);
+      // Vibrant electric royal blue laser guide
+      this.laserLineMat.color.setHex(0x2563eb);
+      this.laserLineMat.opacity = 0.52;
+      this.laserDotMat.color.setHex(0x38bdf8);
+      this.laserDotMesh.scale.setScalar(1.1);
       this.laserRingMat.opacity = 0.0;
     }
   }

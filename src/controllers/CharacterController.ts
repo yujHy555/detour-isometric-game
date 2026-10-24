@@ -1027,7 +1027,23 @@ export class CharacterController {
 
     // Real-Time 2.5D Capsule Obstacle Collision (Smooth Wall Sliding & Zero Clipping)
     if (resolveCollision) {
-      resolveCollision(this.position, this.bodyRadius);
+      const effectiveRadius = this.isFlying ? 0.48 : this.bodyRadius;
+      resolveCollision(this.position, effectiveRadius);
+
+      // Dedicated head/helmet collision check when flying to prevent tilted helmet clipping
+      if (this.isFlying) {
+        const forwardX = -Math.sin(this.group.rotation.y);
+        const forwardZ = -Math.cos(this.group.rotation.y);
+        const headOffset = 0.35;
+        const headPos = new THREE.Vector3(
+          this.position.x + forwardX * headOffset,
+          this.position.y,
+          this.position.z + forwardZ * headOffset
+        );
+        resolveCollision(headPos, 0.32);
+        this.position.x = headPos.x - forwardX * headOffset;
+        this.position.z = headPos.z - forwardZ * headOffset;
+      }
     }
 
     // Integrate Vertical Motion
@@ -1035,7 +1051,7 @@ export class CharacterController {
 
     // Upward ceiling collision resolution (blocks flying/jumping through bottom of sky platforms)
     if (this.velocity.y > 0 && resolveCeiling) {
-      resolveCeiling(this.position, this.velocity, 1.8);
+      resolveCeiling(this.position, this.velocity, 1.92);
     }
 
     // 3. Slope & Ground Height Probing with Snapping & Step Detection

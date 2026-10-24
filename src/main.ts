@@ -260,37 +260,66 @@ class DetourGame {
 
     const startBtn = document.getElementById('btn-menu-start');
     if (startBtn) {
-      startBtn.addEventListener('click', () => {
+      let lastStartTime = 0;
+      const handleStart = (e: Event) => {
+        const now = performance.now();
+        if (now - lastStartTime < 350) return;
+        lastStartTime = now;
+        e.preventDefault();
         this.audio.playGameStart();
         this.toggleMainMenu(false);
-      });
+      };
+      startBtn.addEventListener('click', handleStart);
+      startBtn.addEventListener('touchend', handleStart);
     }
 
     const otherBtnIds = ['btn-menu-load', 'btn-menu-settings', 'btn-menu-quit'];
     otherBtnIds.forEach((id) => {
       const b = document.getElementById(id);
       if (b) {
-        b.addEventListener('click', () => {
+        let lastClickTime = 0;
+        const handleClick = (e: Event) => {
+          const now = performance.now();
+          if (now - lastClickTime < 350) return;
+          lastClickTime = now;
+          e.preventDefault();
           this.audio.playMenuClick();
-        });
+        };
+        b.addEventListener('click', handleClick);
+        b.addEventListener('touchend', handleClick);
       }
     });
 
-    // In-game Menu Open Button
+    // In-game Menu Open Button (Desktop click + Mobile tap support)
     const openMenuBtn = document.getElementById('btn-open-menu');
     if (openMenuBtn) {
-      openMenuBtn.addEventListener('click', () => {
+      let lastMenuOpenTime = 0;
+      const handleOpenMenu = (e: Event) => {
+        const now = performance.now();
+        if (now - lastMenuOpenTime < 350) return;
+        lastMenuOpenTime = now;
+        e.preventDefault();
+        e.stopPropagation();
         this.audio.playMenuClick();
         this.toggleMainMenu(true);
-      });
+      };
+      openMenuBtn.addEventListener('click', handleOpenMenu);
+      openMenuBtn.addEventListener('touchend', handleOpenMenu);
     }
 
     // Camera Mode Toggle Button
     const camToggleBtn = document.getElementById('btn-toggle-cam');
     if (camToggleBtn) {
-      camToggleBtn.addEventListener('click', () => {
+      let lastCamToggle = 0;
+      const handleCamToggle = (e: Event) => {
+        const now = performance.now();
+        if (now - lastCamToggle < 350) return;
+        lastCamToggle = now;
+        e.preventDefault();
         this.toggleCameraMode();
-      });
+      };
+      camToggleBtn.addEventListener('click', handleCamToggle);
+      camToggleBtn.addEventListener('touchend', handleCamToggle);
     }
 
     // Escape Key Menu Toggle
@@ -319,6 +348,10 @@ class DetourGame {
     if (!this.mainMenuEl) return;
     if (show) {
       this.mainMenuEl.classList.remove('hidden');
+      const startSpan = document.querySelector('#btn-menu-start span:not(.btn-bracket)');
+      if (startSpan) {
+        startSpan.textContent = 'RESUME SURVEY';
+      }
     } else {
       this.mainMenuEl.classList.add('hidden');
     }
@@ -569,6 +602,7 @@ class DetourGame {
       (pos, radius) => {
         this.world.resolveHorizontalCollision(pos, radius);
         this.plants.resolveCollisions(pos, radius);
+        this.rayGun.resolveCharacterCollision(pos, radius);
         return pos;
       },
       (pos, vel, h) => this.world.resolveCeilingCollision(pos, vel, h),

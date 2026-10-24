@@ -459,10 +459,10 @@ export class IsometricWorld {
   /**
    * Prevents flying or jumping up through solid platforms from underneath.
    */
-  public resolveCeilingCollision(pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight: number = 1.8): void {
+  public resolveCeilingCollision(pos: THREE.Vector3, velocity: THREE.Vector3, characterHeight: number = 1.92): void {
     const headY = pos.y + characterHeight;
     for (const sp of this.skyPlatforms) {
-      if (pos.x >= sp.minX - 0.25 && pos.x <= sp.maxX + 0.25 && pos.z >= sp.minZ - 0.25 && pos.z <= sp.maxZ + 0.25) {
+      if (pos.x >= sp.minX - 0.35 && pos.x <= sp.maxX + 0.35 && pos.z >= sp.minZ - 0.35 && pos.z <= sp.maxZ + 0.35) {
         if (headY >= sp.bottomY && pos.y < sp.bottomY) {
           pos.y = sp.bottomY - characterHeight;
           if (velocity.y > 0) {
@@ -519,9 +519,9 @@ export class IsometricWorld {
       this.resolveBox(pos, radius, 6, 14, -16, -8);
     }
 
-    // 8. High-Altitude Sky Platforms Horizontal Side Collision
+    // 8. High-Altitude Sky Platforms Horizontal Side Collision (Covers full character height up to helmet)
     for (const sp of this.skyPlatforms) {
-      if (pos.y >= sp.bottomY - 0.2 && pos.y < sp.topY - 0.1) {
+      if (pos.y + 1.92 >= sp.bottomY && pos.y < sp.topY - 0.05) {
         this.resolveBox(pos, radius, sp.minX, sp.maxX, sp.minZ, sp.maxZ);
       }
     }

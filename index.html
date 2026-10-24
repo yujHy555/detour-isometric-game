@@ -284,6 +284,8 @@
       gap: 5px;
       backdrop-filter: blur(8px);
       transition: all 0.2s ease;
+      pointer-events: auto;
+      touch-action: manipulation;
     }
     .hud-icon-btn:hover {
       background: rgba(56, 189, 248, 0.2);
@@ -823,9 +825,18 @@
         font-size: 0.65rem;
         padding: 2px 6px;
       }
+      .hud-quick-actions {
+        margin-top: 3px;
+        gap: 6px;
+        pointer-events: auto;
+        z-index: 60;
+      }
       .hud-icon-btn {
         padding: 3px 8px;
-        font-size: 0.70rem;
+        font-size: 0.68rem;
+        pointer-events: auto;
+        touch-action: manipulation;
+        z-index: 60;
       }
 
       /* FIX 1: Radar & Vital Arcs moved to top-left under logo so it NEVER overlaps bottom-left movement joystick! */
@@ -838,10 +849,10 @@
         pointer-events: none;
       }
 
-      /* FIX 2: Inventory Quick-Slot moved to top-right under objective so it NEVER overlaps bottom-right action buttons! */
+      /* FIX 2: Inventory Quick-Slot moved to top-right below objective & menu so it NEVER overlaps quick actions or bottom-right action buttons! */
       .hud-bottom-right {
         position: absolute;
-        top: 52px;
+        top: 86px;
         right: 14px;
         transform: scale(0.70);
         transform-origin: top right;
@@ -941,15 +952,20 @@
         box-shadow: 0 0 24px rgba(0, 240, 255, 0.9);
       }
 
-      /* Main Menu Button scaling on mobile */
+      /* Main Menu Button scaling on mobile - compact, sleek sci-fi layout */
       .menu-nav {
-        width: clamp(200px, 60vw, 250px);
+        width: clamp(165px, 45vw, 215px);
+        gap: 7px;
         top: 67%;
       }
       .menu-btn {
-        height: 38px;
-        font-size: 0.98rem;
-        letter-spacing: 2.5px;
+        height: 32px;
+        font-size: 0.82rem;
+        letter-spacing: 2.0px;
+        padding: 0 10px;
+      }
+      .menu-btn .btn-bracket {
+        font-size: 1.05rem;
       }
     }
 
@@ -961,9 +977,20 @@
         transform: scale(0.56);
       }
       .hud-bottom-right {
-        top: 44px;
+        top: 76px;
         right: 8px;
         transform: scale(0.60);
+      }
+      .menu-nav {
+        width: clamp(150px, 40vw, 195px);
+        gap: 5px;
+        top: 68%;
+      }
+      .menu-btn {
+        height: 28px;
+        font-size: 0.74rem;
+        letter-spacing: 1.6px;
+        padding: 0 8px;
       }
       .hud-bottom-center {
         bottom: 4px;
