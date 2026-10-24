@@ -162,96 +162,113 @@ export class PlantManager {
   }
 
   /**
-   * Generates organic plant spawn clusters across central parklands, plateaus, and peripheral ridges.
-   * Excludes central plaza spawn pad and main ramp walkway.
+   * Generates organic plant spawn locations across the open terrain floor.
+   * Strictly excludes Central Plaza, all platforms, ramps, and sky platform footprints
+   * with a minimum 2.5-meter buffer so plant meshes and leaves never intersect any structure.
    */
   private generateSpawnLocations(getTerrainHeight: (x: number, z: number, fromY?: number) => number): PlantSpawnDef[] {
     const locations: PlantSpawnDef[] = [];
 
-    // Cluster 1: Outer perimeter of Central Plaza (radius 6.5m to 10.5m)
-    for (let i = 0; i < 14; i++) {
-      const angle = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-      // Skip south entry ramp area
-      if (angle > Math.PI * 0.35 && angle < Math.PI * 0.65) continue;
+    // Comprehensive 2D bounding boxes of all cubes, platforms, and ramps (+ 2.5m plant clearance)
+    const exclusionZones = [
+      // 1. Central Plaza (x: [-8, 8], z: [-8, 8]) + 2.5m clearance
+      { minX: -10.5, maxX: 10.5, minZ: -10.5, maxZ: 10.5 },
 
-      const r = THREE.MathUtils.randFloat(6.8, 10.5);
-      const x = Math.cos(angle) * r;
-      const z = Math.sin(angle) * r;
-      locations.push({
-        x,
-        z,
-        scaleMin: 0.42,
-        scaleMax: 0.95
-      });
-    }
+      // 2. Main South Ramp (x: [-2.5, 2.5], z: [8, 14]) + clearance
+      { minX: -5.0, maxX: 5.0, minZ: 7.0, maxZ: 16.5 },
 
-    // Cluster 2: Elevated Platform 1 around (-12, -8)
-    for (let i = 0; i < 7; i++) {
-      locations.push({
-        x: -12 + (Math.random() - 0.5) * 6.5,
-        z: -8 + (Math.random() - 0.5) * 6.5,
-        scaleMin: 0.45,
-        scaleMax: 1.10
-      });
-    }
+      // 3. Platform 1 (-12, 2.0, -8, size 8x8 -> [-16, -8], [-12, -4]) + clearance
+      { minX: -18.5, maxX: -5.5, minZ: -14.5, maxZ: -1.5 },
 
-    // Cluster 3: Elevated Platform 2 around (14, 10)
-    for (let i = 0; i < 6; i++) {
-      locations.push({
-        x: 14 + (Math.random() - 0.5) * 7.0,
-        z: 10 + (Math.random() - 0.5) * 4.5,
-        scaleMin: 0.50,
-        scaleMax: 1.18
-      });
-    }
+      // 4. Platform 2 & Ramp 2 (14, 1.5, 10, size 10x6 -> [9, 19], [7, 13], ramp to z=19) + clearance
+      { minX: 6.5, maxX: 21.5, minZ: 4.5, maxZ: 21.5 },
 
-    // Cluster 4: Elevated Platform 3 around (10, -12)
-    for (let i = 0; i < 6; i++) {
-      locations.push({
-        x: 10 + (Math.random() - 0.5) * 6.0,
-        z: -12 + (Math.random() - 0.5) * 6.0,
-        scaleMin: 0.48,
-        scaleMax: 1.22
-      });
-    }
+      // 5. Platform 3 (10, 3.0, -12, size 8x8 -> [6, 14], [-16, -8]) + clearance
+      { minX: 3.5, maxX: 16.5, minZ: -18.5, maxZ: -5.5 },
 
-    // Cluster 5: North Open Wilderness (z from -16 to -28)
-    for (let i = 0; i < 12; i++) {
+      // 6. Sky Platform 1 Footprint (0, 5.2, -14, size 10x8) + clearance
+      { minX: -7.5, maxX: 7.5, minZ: -20.5, maxZ: -7.5 },
+
+      // 7. Sky Platform 2 Footprint (16, 7.4, -4, size 8x8) + clearance
+      { minX: 9.5, maxX: 22.5, minZ: -10.5, maxZ: 2.5 },
+
+      // 8. Sky Platform 3 Footprint (-16, 9.8, 6, size 8x8) + clearance
+      { minX: -22.5, maxX: -9.5, minZ: 0.0, maxZ: 12.5 }
+    ];
+
+    // Zone 1: North Open Wilds (z: -34 to -22)
+    for (let i = 0; i < 20; i++) {
       locations.push({
-        x: THREE.MathUtils.randFloat(-24, 24),
-        z: THREE.MathUtils.randFloat(-16, -28),
-        scaleMin: 0.38,
+        x: THREE.MathUtils.randFloat(-33, 33),
+        z: THREE.MathUtils.randFloat(-34, -22),
+        scaleMin: 0.40,
         scaleMax: 1.25
       });
     }
 
-    // Cluster 6: East & West Peripheral Wilds
-    for (let i = 0; i < 8; i++) {
+    // Zone 2: South Open Wilds (z: 22 to 34)
+    for (let i = 0; i < 20; i++) {
       locations.push({
-        x: THREE.MathUtils.randFloat(18, 28),
-        z: THREE.MathUtils.randFloat(-8, 18),
+        x: THREE.MathUtils.randFloat(-33, 33),
+        z: THREE.MathUtils.randFloat(22, 34),
         scaleMin: 0.40,
-        scaleMax: 1.15
-      });
-      locations.push({
-        x: THREE.MathUtils.randFloat(-28, -18),
-        z: THREE.MathUtils.randFloat(-8, 18),
-        scaleMin: 0.40,
-        scaleMax: 1.15
+        scaleMax: 1.25
       });
     }
 
-    // Validate coordinates: prevent spawning in deep void or off-map
-    return locations.filter((pt) => {
-      // Must be within 80x80 floor bounds
-      if (Math.abs(pt.x) > 34 || Math.abs(pt.z) > 34) return false;
-      // Clearance: central spawn area (radius 4.2m)
-      if (Math.hypot(pt.x, pt.z) < 4.2) return false;
-      // Clearance: main south ramp walkway
-      if (Math.abs(pt.x) < 2.4 && pt.z > 6.0 && pt.z < 15.0) return false;
+    // Zone 3: West Open Wilds (x: -34 to -21)
+    for (let i = 0; i < 18; i++) {
+      locations.push({
+        x: THREE.MathUtils.randFloat(-34, -21),
+        z: THREE.MathUtils.randFloat(-22, 22),
+        scaleMin: 0.42,
+        scaleMax: 1.20
+      });
+    }
 
+    // Zone 4: East Open Wilds (x: 23 to 34)
+    for (let i = 0; i < 18; i++) {
+      locations.push({
+        x: THREE.MathUtils.randFloat(23, 34),
+        z: THREE.MathUtils.randFloat(-22, 22),
+        scaleMin: 0.42,
+        scaleMax: 1.20
+      });
+    }
+
+    // Zone 5: Natural Open Pockets between platforms (Clear of all cubes)
+    for (let i = 0; i < 8; i++) {
+      locations.push({
+        x: THREE.MathUtils.randFloat(-19, -12),
+        z: THREE.MathUtils.randFloat(3, 16),
+        scaleMin: 0.38,
+        scaleMax: 0.95
+      });
+      locations.push({
+        x: THREE.MathUtils.randFloat(12, 24),
+        z: THREE.MathUtils.randFloat(22, 32),
+        scaleMin: 0.38,
+        scaleMax: 0.95
+      });
+    }
+
+    // Strict validation filter ensuring zero intersections with any cube, platform, or ramp
+    return locations.filter((pt) => {
+      // 1. Must stay within the 80x80 floor boundary
+      if (Math.abs(pt.x) > 34.5 || Math.abs(pt.z) > 34.5) return false;
+
+      // 2. Must not fall inside ANY structure or platform exclusion zone
+      for (const box of exclusionZones) {
+        if (pt.x >= box.minX && pt.x <= box.maxX && pt.z >= box.minZ && pt.z <= box.maxZ) {
+          return false;
+        }
+      }
+
+      // 3. Strict ground elevation check: must be on the ground floor (y <= 0.05), never on any cube or ramp
       const y = getTerrainHeight(pt.x, pt.z, 15.0);
-      return y >= -0.1;
+      if (y > 0.05 || y < -0.1) return false;
+
+      return true;
     });
   }
 }

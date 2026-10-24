@@ -30,13 +30,87 @@ export class IsometricWorld {
   private downVector: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
   private rayOrigin: THREE.Vector3 = new THREE.Vector3();
 
+  // Shared high-precision architectural grid texture
+  private sharedGridTex!: THREE.CanvasTexture;
+
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group();
     scene.add(this.group);
 
+    this.sharedGridTex = this.createGridTexture();
     this.setupLighting(scene);
     this.buildTerrain();
     this.group.updateMatrixWorld(true);
+  }
+
+  /**
+   * Generates a clean, uniform 1m x 1m architectural grid pattern
+   * applied seamlessly across all ground cubes, ramps, and platforms.
+   */
+  private createGridTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+
+    // Base light grey architectural slate
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(0, 0, 128, 128);
+
+    // Inner tile bevel & subtle texture
+    ctx.fillStyle = '#d9e2ec';
+    ctx.fillRect(2, 2, 124, 124);
+
+    // Crisp uniform 1-meter grid borders
+    ctx.strokeStyle = 'rgba(71, 85, 105, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, 128, 128);
+
+    // Precise center subdivision crosshair tick (+)
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(64, 58); ctx.lineTo(64, 70);
+    ctx.moveTo(58, 64); ctx.lineTo(70, 64);
+    ctx.stroke();
+
+    // Subtle sci-fi cyan corner markers
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.65)';
+    ctx.fillRect(0, 0, 3, 3);
+    ctx.fillRect(125, 0, 3, 3);
+    ctx.fillRect(0, 125, 3, 3);
+    ctx.fillRect(125, 125, 3, 3);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    return tex;
+  }
+
+  /**
+   * Builds an array of materials for BoxGeometry ensuring a strictly uniform 1m grid
+   * on all 6 faces (+X, -X, +Y, -Y, +Z, -Z) regardless of box dimensions.
+   */
+  private createBoxGridMaterials(w: number, h: number, d: number, baseColor: number = 0xcbd5e1): THREE.Material[] {
+    const createFaceMat = (repeatX: number, repeatY: number) => {
+      const tex = this.sharedGridTex.clone();
+      tex.repeat.set(repeatX, repeatY);
+      tex.needsUpdate = true;
+      return new THREE.MeshStandardMaterial({
+        map: tex,
+        color: baseColor,
+        roughness: 0.42,
+        metalness: 0.15
+      });
+    };
+
+    // Three.js BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
+    const matX = createFaceMat(d, h);
+    const matY = createFaceMat(w, d); // Top & Bottom faces
+    const matZ = createFaceMat(w, h);
+    return [matX, matX, matY, matY, matZ, matZ];
   }
 
   private setupLighting(scene: THREE.Scene) {
@@ -74,10 +148,14 @@ export class IsometricWorld {
   }
 
   private buildTerrain() {
-    // 1. Base Grid Floor (Height = 0) - Sophisticated Light Grey Architectural Slate
+    // 1. Base Grid Floor (Height = 0) with uniform 1m x 1m architectural grid pattern
     const floorGeo = new THREE.PlaneGeometry(80, 80);
     floorGeo.rotateX(-Math.PI / 2);
+    const floorTex = this.sharedGridTex.clone();
+    floorTex.repeat.set(80, 80);
+    floorTex.needsUpdate = true;
     const floorMat = new THREE.MeshStandardMaterial({
+      map: floorTex,
       color: 0x94a3b8,
       roughness: 0.5,
       metalness: 0.1
@@ -92,13 +170,9 @@ export class IsometricWorld {
     grid.position.y = 0.01;
     this.group.add(grid);
 
-    // 2. Central Raised Plaza (Height = 1.0, bounds: x [-8, 8], z [-8, 8]) - Refined Light Grey Stone
+    // 2. Central Raised Plaza (Height = 1.0, bounds: x [-8, 8], z [-8, 8]) - Uniform 1m grid tiles
     const plazaGeo = new THREE.BoxGeometry(16, 1.0, 16);
-    const plazaMat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      roughness: 0.4,
-      metalness: 0.12
-    });
+    const plazaMat = this.createBoxGridMaterials(16, 1.0, 16, 0xe2e8f0);
     const plaza = new THREE.Mesh(plazaGeo, plazaMat);
     plaza.position.set(0, 0.5, 0);
     plaza.receiveShadow = true;
@@ -115,11 +189,11 @@ export class IsometricWorld {
     plazaLine.position.copy(plaza.position);
     this.group.add(plazaLine);
 
-    // 3. Precision Solid Wedge Ramps (Clean open architectural slopes without railings)
+    // 3. Precision Solid Wedge Ramps with matching 1m grid
     // South main ramp: Connects plaza z=8, y=1.0 down to ground z=14, y=0.0
     this.createRamp(0, 8, 5.0, 1.0, 6.0, 0);
 
-    // 4. Ground Elevated Platforms - Muted Slate-Grey Decks
+    // 4. Ground Elevated Platforms with matching 1m grid
     this.createPlatform(-12, 2.0, -8, 8, 8);
     this.createPlatform(14, 1.5, 10, 10, 6);
     this.createPlatform(10, 3.0, -12, 8, 8);
@@ -127,7 +201,7 @@ export class IsometricWorld {
     // Second ramp connecting Platform 2 south edge (z=13, y=1.5) down to ground (z=19, y=0.0)
     this.createRamp(14, 13, 4.0, 1.5, 6.0, 0);
 
-    // 5. High-Altitude Test Sky Platforms (Reachable with Jetpack)
+    // 5. High-Altitude Test Sky Platforms (Reachable with Jetpack) with matching 1m grid
     // Sky Platform 1: Central Overlook (x: 0, topY: 5.2, z: -14, size: 10x8)
     this.createSkyPlatform(0, 5.2, -14, 10, 8);
 
@@ -136,12 +210,6 @@ export class IsometricWorld {
 
     // Sky Platform 3: West High Apex Station (x: -16, topY: 9.8, z: 6, size: 8x8)
     this.createSkyPlatform(-16, 9.8, 6, 8, 8);
-
-    // Decorative Sci-Fi Pillars & Beacons
-    this.createPillar(-7, 7, 3.5);
-    this.createPillar(7, 7, 3.5);
-    this.createPillar(-7, -7, 3.5);
-    this.createPillar(7, -7, 3.5);
   }
 
   /**
@@ -152,11 +220,7 @@ export class IsometricWorld {
     const centerY = topY - thickness / 2;
 
     const geo = new THREE.BoxGeometry(w, thickness, d);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1,
-      roughness: 0.38,
-      metalness: 0.2
-    });
+    const mat = this.createBoxGridMaterials(w, thickness, d, 0xcbd5e1);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, centerY, z);
     mesh.receiveShadow = true;
@@ -199,7 +263,7 @@ export class IsometricWorld {
   }
 
   /**
-   * Creates a solid geometric wedge ramp with clean open slope (railings removed)
+   * Creates a solid geometric wedge ramp with uniform 1m architectural grid pattern
    */
   private createRamp(
     startX: number,
@@ -253,10 +317,55 @@ export class IsometricWorld {
       -hw, 0, length
     ];
 
+    // Normalized UV attributes mapped strictly to 1 unit = 1 world meter
+    const uvs = [
+      // Top sloped surface (width x length meters)
+      0, 0,
+      0, length,
+      width, 0,
+
+      width, 0,
+      0, length,
+      width, length,
+
+      // Back vertical face (width x height meters)
+      0, 0,
+      0, height,
+      width, 0,
+
+      width, 0,
+      0, height,
+      width, height,
+
+      // Left triangle side wall
+      0, 0,
+      length, 0,
+      0, height,
+
+      // Right triangle side wall
+      0, 0,
+      0, height,
+      length, 0,
+
+      // Bottom face
+      0, 0,
+      width, 0,
+      0, length,
+
+      width, 0,
+      width, length,
+      0, length
+    ];
+
     geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geom.computeVertexNormals();
 
+    const rampTex = this.sharedGridTex.clone();
+    rampTex.repeat.set(1, 1);
+    rampTex.needsUpdate = true;
     const rampMat = new THREE.MeshStandardMaterial({
+      map: rampTex,
       color: 0xcbd5e1,
       roughness: 0.45,
       metalness: 0.15,
@@ -289,11 +398,7 @@ export class IsometricWorld {
 
   private createPlatform(x: number, y: number, z: number, w: number, d: number) {
     const geo = new THREE.BoxGeometry(w, y, d);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1,
-      roughness: 0.4,
-      metalness: 0.15
-    });
+    const mat = this.createBoxGridMaterials(w, y, d, 0xcbd5e1);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y / 2, z);
     mesh.receiveShadow = true;
@@ -307,32 +412,6 @@ export class IsometricWorld {
     const line = new THREE.LineSegments(edges, lineMat);
     line.position.copy(mesh.position);
     this.group.add(line);
-  }
-
-  private createPillar(x: number, z: number, h: number) {
-    const geo = new THREE.CylinderGeometry(0.3, 0.38, h, 16);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      metalness: 0.35,
-      roughness: 0.25
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, h / 2, z);
-    mesh.castShadow = true;
-    this.group.add(mesh);
-
-    // Glowing cyan beacon cap
-    const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 12, 12),
-      new THREE.MeshBasicMaterial({ color: 0x00f0ff })
-    );
-    cap.position.set(x, h + 0.1, z);
-    this.group.add(cap);
-
-    // Beacon point light
-    const pl = new THREE.PointLight(0x00f0ff, 1.2, 8);
-    pl.position.set(x, h + 0.2, z);
-    this.group.add(pl);
   }
 
   /**
@@ -403,21 +482,7 @@ export class IsometricWorld {
     pos.x = THREE.MathUtils.clamp(pos.x, -maxBound, maxBound);
     pos.z = THREE.MathUtils.clamp(pos.z, -maxBound, maxBound);
 
-    // 2. Pillars (Cylinders at [-7, 7], [7, 7], [-7, -7], [7, -7] with radius 0.42)
-    const pillarR = 0.42;
-    const pillars = [
-      { x: -7, z: 7, h: 3.5 },
-      { x: 7, z: 7, h: 3.5 },
-      { x: -7, z: -7, h: 3.5 },
-      { x: 7, z: -7, h: 3.5 }
-    ];
-    for (const p of pillars) {
-      if (pos.y < p.h) {
-        this.resolveCylinder(pos, radius, p.x, p.z, pillarR);
-      }
-    }
-
-    // 3. Central Plaza Walls (Plaza: x: [-8, 8], z: [-8, 8], height 1.0)
+    // 2. Central Plaza Walls (Plaza: x: [-8, 8], z: [-8, 8], height 1.0)
     if (pos.y < 0.85) {
       const atRampEntrance = Math.abs(pos.x) <= 2.5 && pos.z >= 7.8;
       if (!atRampEntrance) {
@@ -523,18 +588,6 @@ export class IsometricWorld {
       else if (minVal === rightDist) pos.x = maxX + r;
       else if (minVal === topDist) pos.z = minZ - r;
       else pos.z = maxZ + r;
-    }
-  }
-
-  private resolveCylinder(pos: THREE.Vector3, r: number, cx: number, cz: number, pillarR: number) {
-    const dx = pos.x - cx;
-    const dz = pos.z - cz;
-    const dist = Math.hypot(dx, dz);
-    const minDist = r + pillarR;
-    if (dist < minDist && dist > 0.0001) {
-      const overlap = minDist - dist;
-      pos.x += (dx / dist) * overlap;
-      pos.z += (dz / dist) * overlap;
     }
   }
 }
