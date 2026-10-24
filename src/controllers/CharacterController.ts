@@ -316,10 +316,6 @@ export class CharacterController {
             for (const clip of gltf.animations) {
               const name = clip.name.toLowerCase();
               if (name.includes('shoot')) {
-                // Ensure we only register the primary shooting clip (root|_shooting_01) and not duplicates like .001
-                if (this.shootAction || clip.name.includes('.001')) {
-                  continue;
-                }
                 // Isolate tracks for all right arm, shoulder, and hand bones strictly using Frame 1 (t = 0)
                 const frame1Tracks: THREE.KeyframeTrack[] = [];
                 for (const track of clip.tracks) {
@@ -344,12 +340,14 @@ export class CharacterController {
                   1.0,
                   frame1Tracks
                 );
-                this.shootAction = this.mixer.clipAction(maskedShootClip);
-                this.shootAction.loop = THREE.LoopOnce;
-                this.shootAction.clampWhenFinished = true;
-                this.actions.set('shoot', this.shootAction);
+                const action = this.mixer.clipAction(maskedShootClip);
+                action.loop = THREE.LoopOnce;
+                action.clampWhenFinished = true;
+                this.actions.set(name, action);
+                this.actions.set('shoot', action);
+                this.shootAction = action;
                 clipNames.push(clip.name + ' [Frame 1 Right Arm]');
-                console.log(`[CharacterController] Registered Frame 1 shoot action with ${frame1Tracks.length} right arm tracks`);
+                console.log(`[CharacterController] Registered shooting action for "${clip.name}" and "shoot" (${frame1Tracks.length} tracks)`);
                 continue;
               }
 
@@ -727,7 +725,7 @@ export class CharacterController {
     this.aimStanceWeight = 1.0;
     this.applyShootingArmPose();
 
-    const shootAction = this.shootAction || this.findAction('shoot');
+    const shootAction = this.shootAction || this.findAction('root|_shooting_01.001') || this.findAction('shoot');
     if (shootAction) {
       shootAction.reset();
       shootAction.setEffectiveTimeScale(1.0);
