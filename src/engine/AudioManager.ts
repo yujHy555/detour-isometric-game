@@ -679,4 +679,65 @@ export class AudioManager {
       noise.stop(t + 0.09);
     }
   }
+
+  /**
+   * Powerful sci-fi explosion sound when a target sphere is destroyed
+   */
+  public playTargetExplosion() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // 1. Deep sub-bass impact boom
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'triangle';
+    subOsc.frequency.setValueAtTime(150, t);
+    subOsc.frequency.exponentialRampToValueAtTime(30, t + 0.35);
+
+    subGain.gain.setValueAtTime(0.75, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 0.4);
+
+    // 2. High-energy plasma shattering transient
+    const midOsc = this.ctx.createOscillator();
+    const midGain = this.ctx.createGain();
+    midOsc.type = 'sawtooth';
+    midOsc.frequency.setValueAtTime(920, t);
+    midOsc.frequency.exponentialRampToValueAtTime(110, t + 0.22);
+
+    midGain.gain.setValueAtTime(0.5, t);
+    midGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+
+    midOsc.connect(midGain);
+    midGain.connect(this.ctx.destination);
+    midOsc.start(t);
+    midOsc.stop(t + 0.28);
+
+    // 3. Debris and plasma crackle noise burst
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(3600, t);
+      filter.frequency.exponentialRampToValueAtTime(350, t + 0.35);
+
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.55, t);
+      nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.ctx.destination);
+      noise.start(t);
+      noise.stop(t + 0.4);
+    }
+  }
 }

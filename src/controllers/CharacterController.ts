@@ -671,6 +671,7 @@ export class CharacterController {
    */
   public getMuzzlePositionAndDirection(): { position: THREE.Vector3; direction: THREE.Vector3 } {
     if (this.gunEmitterNode) {
+      this.group.updateMatrixWorld(true);
       this.gunEmitterNode.updateWorldMatrix(true, false);
       const position = new THREE.Vector3();
       this.gunEmitterNode.getWorldPosition(position);

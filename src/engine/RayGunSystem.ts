@@ -11,6 +11,33 @@ interface RayBeam {
   timer: number;
   maxTime: number;
   initialRadius: number;
+  initialDist: number;
+  hitPoint: THREE.Vector3;
+}
+
+interface TargetSphere {
+  mesh: THREE.Mesh;
+  basePos: THREE.Vector3;
+  isAir: boolean;
+  phase: number;
+  isAlive: boolean;
+  respawnTimer: number;
+  ringMesh?: THREE.Mesh;
+}
+
+interface ExplosionParticle {
+  mesh: THREE.Mesh;
+  vx: number;
+  vy: number;
+  vz: number;
+  timer: number;
+  maxTime: number;
+}
+
+interface ExplosionLight {
+  light: THREE.PointLight;
+  timer: number;
+  maxTime: number;
 }
 
 interface ImpactSpark {
@@ -49,6 +76,12 @@ export class RayGunSystem {
   private gunShadowGroup?: THREE.Group;
   private gunBobTimer: number = 0;
   private atomRings: THREE.Mesh[] = [];
+
+  // Yellow Sphere Test Targets
+  public targets: TargetSphere[] = [];
+  private targetGroup!: THREE.Group;
+  private activeExplosionParticles: ExplosionParticle[] = [];
+  private activeExplosionLights: ExplosionLight[] = [];
 
   // Firing mechanics
   private cooldown: number = 0;
@@ -169,6 +202,7 @@ export class RayGunSystem {
     this.scene.add(this.muzzleFlashGroup);
 
     this.spawnWorldCollectible();
+    this.createTestTargets();
   }
 
   /**
@@ -331,11 +365,14 @@ export class RayGunSystem {
       }
     }
 
-    // 2. Update Muzzle Flash (volumetric expansion and smooth dissipation)
+    // 2. Update Muzzle Flash (volumetric expansion and smooth dissipation, dynamically locked to live barrel tip)
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer -= dt;
       const progress = Math.max(0, this.muzzleFlashTimer) / 0.09;
+      const liveMuzzle = this.character.getMuzzlePositionAndDirection();
+      this.muzzleLight.position.copy(liveMuzzle.position);
       this.muzzleLight.intensity = progress * 6.0;
+      this.muzzleFlashGroup.position.copy(liveMuzzle.position).addScaledVector(liveMuzzle.direction, 0.04);
       this.muzzleFlashGroup.scale.setScalar(0.75 + (1.0 - progress) * 0.45);
       this.muzzleSpriteMat.opacity = progress * 0.95;
       this.muzzleCoreMat.opacity = progress * 1.0;
@@ -346,7 +383,8 @@ export class RayGunSystem {
       }
     }
 
-    // 3. Update Active Ray Beams (instant laser flash that contracts and dissipates)
+    // 3. Update Active Ray Beams (dynamically anchored to live barrel tip during movement)
+    const liveMuzzlePos = this.character.getMuzzlePosition();
     for (let i = this.activeBeams.length - 1; i >= 0; i--) {
       const beam = this.activeBeams[i];
       beam.timer -= dt;
@@ -359,8 +397,13 @@ export class RayGunSystem {
         this.activeBeams.splice(i, 1);
       } else {
         const factor = Math.max(0, beam.timer) / beam.maxTime;
-        beam.core.scale.set(factor, 1.0, factor);
-        beam.glow.scale.set(factor, 1.0, factor);
+        // Dynamically lock beam start to moving barrel tip so it never detaches when walking/running/flying
+        beam.group.position.copy(liveMuzzlePos);
+        beam.group.lookAt(beam.hitPoint);
+        const currentDist = liveMuzzlePos.distanceTo(beam.hitPoint);
+        const lengthScale = currentDist / Math.max(0.01, beam.initialDist);
+        beam.core.scale.set(factor, factor, lengthScale);
+        beam.glow.scale.set(factor, factor, lengthScale);
         (beam.glow.material as THREE.MeshBasicMaterial).opacity = factor * 0.85;
       }
     }
@@ -415,6 +458,42 @@ export class RayGunSystem {
       } else {
         const factor = Math.max(0, scorch.timer) / scorch.maxTime;
         (scorch.mesh.material as THREE.MeshBasicMaterial).opacity = factor * 0.75;
+      }
+    }
+
+    // 7. Update Yellow Sphere Test Targets & Floating Drone Animation
+    this.updateTestTargets(dt);
+
+    // 8. Update Target Explosion Plasma Shards
+    for (let i = this.activeExplosionParticles.length - 1; i >= 0; i--) {
+      const p = this.activeExplosionParticles[i];
+      p.timer -= dt;
+      if (p.timer <= 0) {
+        this.scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        (p.mesh.material as THREE.Material).dispose();
+        this.activeExplosionParticles.splice(i, 1);
+      } else {
+        p.mesh.position.x += p.vx * dt;
+        p.mesh.position.y += p.vy * dt;
+        p.mesh.position.z += p.vz * dt;
+        p.vy -= 14.0 * dt; // Gravity
+        const progress = Math.max(0, p.timer) / p.maxTime;
+        p.mesh.scale.setScalar(progress);
+        (p.mesh.material as THREE.MeshBasicMaterial).opacity = progress;
+      }
+    }
+
+    // 9. Update Target Explosion Flash Lights
+    for (let i = this.activeExplosionLights.length - 1; i >= 0; i--) {
+      const fl = this.activeExplosionLights[i];
+      fl.timer -= dt;
+      if (fl.timer <= 0) {
+        this.scene.remove(fl.light);
+        this.activeExplosionLights.splice(i, 1);
+      } else {
+        const progress = Math.max(0, fl.timer) / fl.maxTime;
+        fl.light.intensity = progress * 9.0;
       }
     }
   }
@@ -475,12 +554,14 @@ export class RayGunSystem {
     this.raycaster.set(muzzlePos, aimDir);
     this.raycaster.far = 60.0;
 
-    const colliders: THREE.Object3D[] = [...this.world.terrainColliders, this.plants.getGroup()];
+    const aliveTargetMeshes = this.targets.filter(t => t.isAlive).map(t => t.mesh);
+    const colliders: THREE.Object3D[] = [...this.world.terrainColliders, this.plants.getGroup(), ...aliveTargetMeshes];
     const hits = this.raycaster.intersectObjects(colliders, true);
 
     let hitPoint: THREE.Vector3;
     let hitNormal: THREE.Vector3;
     let didHit = false;
+    let hitTarget: TargetSphere | undefined;
 
     if (hits.length > 0) {
       const hit = hits[0];
@@ -488,6 +569,7 @@ export class RayGunSystem {
       hitNormal = hit.face ? hit.face.normal.clone() : new THREE.Vector3(0, 1, 0);
       if (hit.object) {
         hitNormal.transformDirection(hit.object.matrixWorld);
+        hitTarget = this.targets.find(t => t.isAlive && (t.mesh === hit.object || hit.object.parent === t.mesh));
       }
       didHit = true;
     } else {
@@ -501,8 +583,10 @@ export class RayGunSystem {
     // 6. Spawn Dynamic Muzzle Flash Light & Starburst
     this.spawnMuzzleFlash(muzzlePos, aimDir);
 
-    // 7. Spawn Impact Sparks, Plasma Shockwave & Scorch Decal if surface was struck
-    if (didHit) {
+    // 7. Process Impact: Explode test target sphere or spawn surface sparks/ring/scorch
+    if (hitTarget) {
+      this.explodeTarget(hitTarget, hitPoint, aimDir);
+    } else if (didHit) {
       try {
         this.audio.playRayImpact();
       } catch {
@@ -564,7 +648,9 @@ export class RayGunSystem {
       glow: glowMesh,
       timer: 0.12,
       maxTime: 0.12,
-      initialRadius: 0.075
+      initialRadius: 0.075,
+      initialDist: dist,
+      hitPoint: end.clone()
     });
   }
 
@@ -658,6 +744,163 @@ export class RayGunSystem {
       mesh: scorch,
       timer: 1.2,
       maxTime: 1.2
+    });
+  }
+
+  /**
+   * Creates yellow test target spheres placed on the ground and hovering in the air
+   */
+  private createTestTargets() {
+    this.targetGroup = new THREE.Group();
+    this.scene.add(this.targetGroup);
+
+    const sphereGeo = new THREE.SphereGeometry(0.45, 24, 24);
+    const sphereMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 0.42,
+      roughness: 0.22,
+      metalness: 0.32
+    });
+
+    const targetPositions: { pos: THREE.Vector3; isAir: boolean }[] = [
+      // Ground targets (Resting/hovering above ground & terraces)
+      { pos: new THREE.Vector3(5.0, 1.55, 3.5), isAir: false },
+      { pos: new THREE.Vector3(-5.5, 1.55, 2.0), isAir: false },
+      { pos: new THREE.Vector3(7.5, 1.55, -5.0), isAir: false },
+      { pos: new THREE.Vector3(-7.5, 1.55, 6.0), isAir: false },
+      { pos: new THREE.Vector3(0.0, 1.55, 7.5), isAir: false },
+
+      // Air targets (Hovering in air for jetpack flight target practice)
+      { pos: new THREE.Vector3(4.0, 4.8, 5.0), isAir: true },
+      { pos: new THREE.Vector3(-6.0, 5.8, 2.0), isAir: true },
+      { pos: new THREE.Vector3(1.0, 6.8, -6.5), isAir: true },
+      { pos: new THREE.Vector3(7.5, 6.0, 0.5), isAir: true },
+      { pos: new THREE.Vector3(-3.5, 8.2, -4.0), isAir: true }
+    ];
+
+    targetPositions.forEach((cfg) => {
+      const mesh = new THREE.Mesh(sphereGeo, sphereMat.clone());
+      mesh.position.copy(cfg.pos);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      // Soft orbiting corona ring for air targets to distinguish drone targets
+      let ringMesh: THREE.Mesh | undefined;
+      if (cfg.isAir) {
+        const ringGeo = new THREE.TorusGeometry(0.62, 0.02, 6, 24);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xfde047,
+          transparent: true,
+          opacity: 0.75,
+          blending: THREE.AdditiveBlending
+        });
+        ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.rotation.x = Math.PI / 2.5;
+        mesh.add(ringMesh);
+      }
+
+      this.targetGroup.add(mesh);
+      this.targets.push({
+        mesh,
+        basePos: cfg.pos.clone(),
+        isAir: cfg.isAir,
+        phase: Math.random() * Math.PI * 2,
+        isAlive: true,
+        respawnTimer: 0,
+        ringMesh
+      });
+    });
+  }
+
+  /**
+   * Animates target sphere bobbing and handles smooth respawn
+   */
+  private updateTestTargets(dt: number) {
+    for (const target of this.targets) {
+      if (target.isAlive) {
+        target.phase += dt * (target.isAir ? 2.0 : 1.5);
+        target.mesh.position.y = target.basePos.y + Math.sin(target.phase) * (target.isAir ? 0.28 : 0.08);
+        target.mesh.rotation.y += dt * 1.8;
+        if (target.ringMesh) {
+          target.ringMesh.rotation.z += dt * 2.5;
+        }
+      } else {
+        target.respawnTimer -= dt;
+        if (target.respawnTimer <= 0) {
+          target.isAlive = true;
+          target.mesh.visible = true;
+          target.mesh.scale.set(0.01, 0.01, 0.01);
+        }
+      }
+
+      // Pop-in scale expansion animation when reviving
+      if (target.isAlive && target.mesh.scale.x < 1.0) {
+        const nextScale = Math.min(1.0, target.mesh.scale.x + dt * 4.0);
+        target.mesh.scale.set(nextScale, nextScale, nextScale);
+      }
+    }
+  }
+
+  /**
+   * Explodes a yellow target sphere into plasma shards, shockwaves, and dynamic light
+   */
+  private explodeTarget(target: TargetSphere, hitPoint: THREE.Vector3, hitDir: THREE.Vector3) {
+    target.isAlive = false;
+    target.mesh.visible = false;
+    target.respawnTimer = 3.5;
+
+    // 1. Audio Explosion
+    try {
+      this.audio.playTargetExplosion();
+    } catch {
+      // Audio fallback
+    }
+
+    // 2. High-energy exploding plasma shards
+    const particleCount = 28;
+    for (let i = 0; i < particleCount; i++) {
+      const geo = new THREE.SphereGeometry(0.045 + Math.random() * 0.035, 6, 6);
+      const color = Math.random() < 0.6 ? 0xfacc15 : (Math.random() < 0.8 ? 0xf59e0b : 0xffffff);
+      const mat = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending
+      });
+      const pMesh = new THREE.Mesh(geo, mat);
+      pMesh.position.copy(hitPoint);
+
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const speed = 3.5 + Math.random() * 5.5;
+
+      const vx = Math.sin(phi) * Math.cos(theta) * speed + hitDir.x * 2.0;
+      const vy = Math.cos(phi) * speed + Math.random() * 2.5;
+      const vz = Math.sin(phi) * Math.sin(theta) * speed + hitDir.z * 2.0;
+
+      this.scene.add(pMesh);
+      this.activeExplosionParticles.push({
+        mesh: pMesh,
+        vx,
+        vy,
+        vz,
+        timer: 0.6 + Math.random() * 0.4,
+        maxTime: 0.6 + Math.random() * 0.4
+      });
+    }
+
+    // 3. Expanding Golden Shockwave Blast Ring
+    this.spawnImpactRing(hitPoint, new THREE.Vector3(0, 1, 0), 4.2);
+
+    // 4. Radiant Explosion Light Flash
+    const flashLight = new THREE.PointLight(0xfacc15, 9.0, 12.0);
+    flashLight.position.copy(hitPoint);
+    this.scene.add(flashLight);
+    this.activeExplosionLights.push({
+      light: flashLight,
+      timer: 0.28,
+      maxTime: 0.28
     });
   }
 }
