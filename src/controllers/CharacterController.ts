@@ -244,9 +244,13 @@ export class CharacterController {
 
             // Cache right arm bones for Frame 1 shooting animation pose
             if ((child as THREE.Bone).isBone) {
+              if (child.name === 'shoulder.R') return; // Rigify control widget without children
+
               const bKey = child.name.toLowerCase().replace(/[\._\-\s]/g, '');
               if (this.isRightArmBone(child.name)) {
-                this.rightArmBones.set(bKey, child as THREE.Bone);
+                if (!this.rightArmBones.has(bKey) || child.children.length > 0) {
+                  this.rightArmBones.set(bKey, child as THREE.Bone);
+                }
               }
               if (bKey === 'armstretchr') {
                 this.upperArmBone = child as THREE.Bone;
@@ -316,22 +320,27 @@ export class CharacterController {
             for (const clip of gltf.animations) {
               const name = clip.name.toLowerCase();
               if (name.includes('shoot')) {
-                // Isolate tracks for all right arm, shoulder, and hand bones strictly using Frame 1 (t = 0)
+                // Construct Frame 1 right arm tracks from FRAME1_RIGHT_ARM_POSE so gun points dead straight forward
                 const frame1Tracks: THREE.KeyframeTrack[] = [];
-                for (const track of clip.tracks) {
-                  const boneName = track.name.slice(0, track.name.lastIndexOf('.'));
-                  if (this.isRightArmBone(boneName)) {
-                    const stride = track.values.length / track.times.length;
-                    const frame1Val = Array.from(track.values.slice(0, stride));
-                    let staticTrack: THREE.KeyframeTrack;
-                    if (track instanceof THREE.QuaternionKeyframeTrack || track.name.endsWith('.quaternion')) {
-                      staticTrack = new THREE.QuaternionKeyframeTrack(track.name, [0, 1], [...frame1Val, ...frame1Val]);
-                    } else if (track instanceof THREE.VectorKeyframeTrack || track.name.endsWith('.position') || track.name.endsWith('.scale')) {
-                      staticTrack = new THREE.VectorKeyframeTrack(track.name, [0, 1], [...frame1Val, ...frame1Val]);
-                    } else {
-                      staticTrack = new THREE.NumberKeyframeTrack(track.name, [0, 1], [...frame1Val, ...frame1Val]);
+                for (const [bKey, pose] of Object.entries(FRAME1_RIGHT_ARM_POSE)) {
+                  const bone = this.rightArmBones.get(bKey);
+                  if (bone) {
+                    frame1Tracks.push(
+                      new THREE.QuaternionKeyframeTrack(
+                        `${bone.name}.quaternion`,
+                        [0, 1],
+                        [pose.quaternion.x, pose.quaternion.y, pose.quaternion.z, pose.quaternion.w, pose.quaternion.x, pose.quaternion.y, pose.quaternion.z, pose.quaternion.w]
+                      )
+                    );
+                    if (pose.position) {
+                      frame1Tracks.push(
+                        new THREE.VectorKeyframeTrack(
+                          `${bone.name}.position`,
+                          [0, 1],
+                          [pose.position.x, pose.position.y, pose.position.z, pose.position.x, pose.position.y, pose.position.z]
+                        )
+                      );
                     }
-                    frame1Tracks.push(staticTrack);
                   }
                 }
 
@@ -395,6 +404,7 @@ export class CharacterController {
    * and raw bone names (shoulder.r, hand.r).
    */
   private isRightArmBone(boneName: string): boolean {
+    if (boneName === 'shoulder.R') return false; // Exclude Rigify control bone
     const n = boneName.toLowerCase().replace(/[\._\-\s]/g, '');
 
     // Exclude lower body, legs, hips, feet, toes, spine, head, left side
