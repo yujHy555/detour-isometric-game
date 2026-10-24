@@ -63,7 +63,10 @@ export class RayGunSystem {
 
   // Muzzle Flash
   private muzzleLight: THREE.PointLight;
-  private muzzleFlashMesh: THREE.Mesh;
+  private muzzleFlashGroup: THREE.Group;
+  private muzzleSpriteMat: THREE.SpriteMaterial;
+  private muzzleCoreMat: THREE.MeshBasicMaterial;
+  private muzzleCoronaMat: THREE.MeshBasicMaterial;
   private muzzleFlashTimer: number = 0;
 
   // Shared Geometries & Materials
@@ -110,19 +113,60 @@ export class RayGunSystem {
     this.muzzleLight = new THREE.PointLight(0x00f0ff, 0, 7.0);
     this.scene.add(this.muzzleLight);
 
-    // Muzzle starburst cross flare
-    const flareGeo = new THREE.PlaneGeometry(0.35, 0.35);
-    const flareMat = new THREE.MeshBasicMaterial({
-      color: 0xe0f2fe,
+    // Procedural Soft Glowing Plasma Flare Texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+    grad.addColorStop(0.2, 'rgba(0, 240, 255, 0.9)');
+    grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+    const flareTex = new THREE.CanvasTexture(canvas);
+
+    this.muzzleFlashGroup = new THREE.Group();
+
+    // 1. Camera-facing soft billboard sprite (eliminates flat edge-on appearance)
+    this.muzzleSpriteMat = new THREE.SpriteMaterial({
+      map: flareTex,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
       depthWrite: false
     });
-    this.muzzleFlashMesh = new THREE.Mesh(flareGeo, flareMat);
-    this.muzzleFlashMesh.visible = false;
-    this.scene.add(this.muzzleFlashMesh);
+    const sprite = new THREE.Sprite(this.muzzleSpriteMat);
+    sprite.scale.set(0.48, 0.48, 0.48);
+    this.muzzleFlashGroup.add(sprite);
+
+    // 2. High-intensity 3D volumetric core sphere (pure white radiant plasma)
+    this.muzzleCoreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const coreGeo = new THREE.SphereGeometry(0.045, 12, 12);
+    const core = new THREE.Mesh(coreGeo, this.muzzleCoreMat);
+    this.muzzleFlashGroup.add(core);
+
+    // 3. Volumetric cyan plasma corona sphere
+    this.muzzleCoronaMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const coronaGeo = new THREE.SphereGeometry(0.09, 12, 12);
+    const corona = new THREE.Mesh(coronaGeo, this.muzzleCoronaMat);
+    this.muzzleFlashGroup.add(corona);
+
+    this.muzzleFlashGroup.visible = false;
+    this.scene.add(this.muzzleFlashGroup);
 
     this.spawnWorldCollectible();
   }
@@ -287,15 +331,18 @@ export class RayGunSystem {
       }
     }
 
-    // 2. Update Muzzle Flash
+    // 2. Update Muzzle Flash (volumetric expansion and smooth dissipation)
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer -= dt;
-      const progress = Math.max(0, this.muzzleFlashTimer) / 0.08;
-      this.muzzleLight.intensity = progress * 4.5;
-      (this.muzzleFlashMesh.material as THREE.MeshBasicMaterial).opacity = progress * 0.95;
+      const progress = Math.max(0, this.muzzleFlashTimer) / 0.09;
+      this.muzzleLight.intensity = progress * 6.0;
+      this.muzzleFlashGroup.scale.setScalar(0.75 + (1.0 - progress) * 0.45);
+      this.muzzleSpriteMat.opacity = progress * 0.95;
+      this.muzzleCoreMat.opacity = progress * 1.0;
+      this.muzzleCoronaMat.opacity = progress * 0.75;
       if (this.muzzleFlashTimer <= 0) {
         this.muzzleLight.intensity = 0;
-        this.muzzleFlashMesh.visible = false;
+        this.muzzleFlashGroup.visible = false;
       }
     }
 
@@ -526,19 +573,21 @@ export class RayGunSystem {
   }
 
   /**
-   * Spawns a sharp muzzle starburst and dynamic cyan light flash at the gun tip
+   * Spawns a 3D volumetric plasma muzzle burst and dynamic light at the gun barrel tip
    */
   private spawnMuzzleFlash(muzzlePos: THREE.Vector3, aimDir: THREE.Vector3) {
     this.muzzleLight.position.copy(muzzlePos);
-    this.muzzleLight.intensity = 4.5;
+    this.muzzleLight.intensity = 6.0;
 
-    this.muzzleFlashMesh.position.copy(muzzlePos).addScaledVector(aimDir, 0.06);
-    this.muzzleFlashMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), aimDir);
-    this.muzzleFlashMesh.rotation.z = Math.random() * Math.PI;
-    (this.muzzleFlashMesh.material as THREE.MeshBasicMaterial).opacity = 0.95;
-    this.muzzleFlashMesh.visible = true;
+    this.muzzleFlashGroup.position.copy(muzzlePos).addScaledVector(aimDir, 0.04);
+    this.muzzleFlashGroup.scale.setScalar(0.75);
+    this.muzzleFlashGroup.visible = true;
 
-    this.muzzleFlashTimer = 0.08;
+    this.muzzleSpriteMat.opacity = 0.95;
+    this.muzzleCoreMat.opacity = 1.0;
+    this.muzzleCoronaMat.opacity = 0.75;
+
+    this.muzzleFlashTimer = 0.09;
   }
 
   /**

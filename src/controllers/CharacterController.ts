@@ -39,6 +39,7 @@ export class CharacterController {
   public gunMesh?: THREE.Object3D;
   public handBone?: THREE.Bone;
   private shootAnimTimer: number = 0;
+  private shootAction?: THREE.AnimationAction;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
   private spineBone?: THREE.Bone;
   private jetpackFlamesGroup!: THREE.Group;
@@ -234,8 +235,28 @@ export class CharacterController {
             const clipNames: string[] = [];
             for (const clip of gltf.animations) {
               const name = clip.name.toLowerCase();
+              if (name.includes('shoot')) {
+                // Isolate tracks affecting only the right arm bones (shoulder, arm, forearm, hand, fingers, weapon)
+                const rightArmTracks = clip.tracks.filter(track => {
+                  const boneName = track.name.slice(0, track.name.lastIndexOf('.'));
+                  return this.isRightArmBone(boneName);
+                });
+                const maskedShootClip = new THREE.AnimationClip(
+                  'shoot_right_arm',
+                  clip.duration,
+                  rightArmTracks
+                );
+                this.shootAction = this.mixer.clipAction(maskedShootClip);
+                this.shootAction.loop = THREE.LoopOnce;
+                this.shootAction.clampWhenFinished = true;
+                this.actions.set('shoot', this.shootAction);
+                clipNames.push(clip.name + ' [Right Arm Layered]');
+                console.log(`[CharacterController] Registered masked right-arm shoot action with ${rightArmTracks.length} tracks`);
+                continue;
+              }
+
               const action = this.mixer.clipAction(clip);
-              if (name.includes('jump') || name.includes('shoot')) {
+              if (name.includes('jump')) {
                 action.loop = THREE.LoopOnce;
                 action.clampWhenFinished = true;
               }
@@ -269,6 +290,54 @@ export class CharacterController {
     };
 
     tryLoad(0);
+  }
+
+  /**
+   * Identifies whether a bone belongs to the right arm, hand, or fingers
+   * to allow isolated upper-body shooting layered on top of any movement
+   */
+  private isRightArmBone(boneName: string): boolean {
+    const n = boneName.toLowerCase();
+    // Exclude lower body, legs, hips, spine, neck, head, left arm
+    if (
+      n.includes('leg') ||
+      n.includes('thigh') ||
+      n.includes('foot') ||
+      n.includes('toe') ||
+      n.includes('spine') ||
+      n.includes('neck') ||
+      n.includes('head') ||
+      n.includes('root') ||
+      n.includes('helmet') ||
+      n.includes('backpack') ||
+      n.endsWith('.l') ||
+      n.includes('.l.')
+    ) {
+      return false;
+    }
+    // Include right shoulder, arm, forearm, hand, fingers, and weapon
+    return (
+      n.includes('shoulder.r') ||
+      n.includes('arm_stretch.r') ||
+      n.includes('arm_twist.r') ||
+      n.includes('forearm_stretch.r') ||
+      n.includes('forearm_twist.r') ||
+      n.includes('hand.r') ||
+      (n.endsWith('.r') && (
+        n.includes('index') ||
+        n.includes('middle') ||
+        n.includes('pinky') ||
+        n.includes('ring') ||
+        n.includes('thumb') ||
+        n.includes('arm') ||
+        n.includes('hand') ||
+        n.includes('wrist')
+      )) ||
+      n.includes('atom ray gun') ||
+      n.includes('ray gun') ||
+      n.includes('gun') ||
+      n.includes('pistol')
+    );
   }
 
   private findAction(name: string): THREE.AnimationAction | undefined {
@@ -505,17 +574,12 @@ export class CharacterController {
 
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
-    this.state = CharacterState.SHOOT;
-    const shootAction = this.findAction('shoot');
+    const shootAction = this.shootAction || this.findAction('shoot');
     if (shootAction) {
-      if (this.currentAction && this.currentAction !== shootAction) {
-        this.currentAction.fadeOut(0.04);
-      }
       shootAction.reset();
       shootAction.setEffectiveTimeScale(1.0);
-      shootAction.setEffectiveWeight(1.0);
-      shootAction.fadeIn(0.04).play();
-      this.currentAction = shootAction;
+      shootAction.setEffectiveWeight(25.0);
+      shootAction.fadeIn(0.03).play();
     }
   }
 
@@ -858,11 +922,16 @@ export class CharacterController {
       (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.65 - heightAboveGround * 0.1, 0.1, 0.65);
     }
 
-    // 5. Animation State Machine (Shoot priority -> Jetpack -> Jump/Fall -> Walk/Run -> Idle)
+    // Layered Upper-Body Shoot Animation Decay
     if (this.shootAnimTimer > 0) {
       this.shootAnimTimer -= dt;
-      this.state = CharacterState.SHOOT;
-    } else if (this.isFlying) {
+      if (this.shootAnimTimer <= 0 && this.shootAction) {
+        this.shootAction.fadeOut(0.08);
+      }
+    }
+
+    // 5. Animation State Machine (Jetpack -> Jump/Fall -> Walk/Run -> Idle)
+    if (this.isFlying) {
       if (this.flyTimer < 0.42 && !isMoving && !this.wasInAir) {
         this.state = CharacterState.IDLE;
       } else {
@@ -879,12 +948,10 @@ export class CharacterController {
     // Update GLB Mixer Animations
     if (this.mixer) {
       this.mixer.update(dt);
-      const fadeDuration = this.state === CharacterState.SHOOT ? 0.04 : (this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15));
+      const fadeDuration = this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15);
       this.playAnimation(this.state, fadeDuration);
       if (this.currentAction) {
-        if (this.state === CharacterState.SHOOT) {
-          this.currentAction.timeScale = 1.0;
-        } else if (this.state === CharacterState.RUN) {
+        if (this.state === CharacterState.RUN) {
           // Dynamic stride match for running: 4.6 m/s base gives perfect foot placement with 0 sliding
           this.currentAction.timeScale = Math.max(0.7, horizontalSpeed / 4.6);
         } else if (this.state === CharacterState.WALK) {
