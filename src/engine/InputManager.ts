@@ -23,6 +23,8 @@ export class InputManager {
   public isRunning: boolean = false;
   public jumpJustPressed: boolean = false;
   public jumpBufferTimer: number = 0;
+  public shootJustPressed: boolean = false;
+  public isShootingHeld: boolean = false;
   public actionJustPressed: boolean = false;
   public cameraToggleRequested: boolean = false;
   public isJetpackHeld: boolean = false;
@@ -44,6 +46,7 @@ export class InputManager {
 
   private prevGamepadJump: boolean = false;
   private prevGamepadAction: boolean = false;
+  private prevGamepadShoot: boolean = false;
 
   private mouseScreenX: number = 0;
   private mouseScreenY: number = 0;
@@ -91,7 +94,11 @@ export class InputManager {
 
   private onMouseDown(e: MouseEvent) {
     this.lastInputType = 'keyboard';
-    if (e.button === 2) {
+    if (e.button === 0) {
+      // Primary shoot fire
+      this.shootJustPressed = true;
+      this.isShootingHeld = true;
+    } else if (e.button === 2) {
       this.isAiming = true;
     } else if (e.button === 1) {
       // Middle-click jump support (immune to any keyboard ghosting)
@@ -102,7 +109,9 @@ export class InputManager {
   }
 
   private onMouseUp(e: MouseEvent) {
-    if (e.button === 2) {
+    if (e.button === 0) {
+      this.isShootingHeld = false;
+    } else if (e.button === 2) {
       this.isAiming = false;
     }
   }
@@ -175,6 +184,12 @@ export class InputManager {
     if (e.code === 'KeyE' || e.code === 'KeyF' || e.key === 'e' || e.key === 'f') {
       this.actionJustPressed = true;
     }
+
+    // Keyboard shoot fire keys (F, Q)
+    if (e.code === 'KeyF' || e.key === 'f' || e.code === 'KeyQ' || e.key === 'q') {
+      this.shootJustPressed = true;
+      this.isShootingHeld = true;
+    }
   }
 
   private onKeyUp(e: KeyboardEvent) {
@@ -183,6 +198,10 @@ export class InputManager {
       this.keys[e.key] = false;
     }
     this.shiftDown = e.shiftKey;
+
+    if (e.code === 'KeyF' || e.key === 'f' || e.code === 'KeyQ' || e.key === 'q') {
+      this.isShootingHeld = false;
+    }
   }
 
   private onMouseMove(e: MouseEvent) {
@@ -310,6 +329,22 @@ export class InputManager {
       btnJetpack.addEventListener('touchcancel', stopJet);
       window.addEventListener('touchend', stopJet);
       window.addEventListener('touchcancel', stopJet);
+    }
+
+    const btnFire = document.getElementById('btn-touch-fire');
+    if (btnFire) {
+      btnFire.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this.lastInputType = 'touch';
+        this.shootJustPressed = true;
+        this.isShootingHeld = true;
+      });
+      const stopFire = (e: TouchEvent) => {
+        e.preventDefault();
+        this.isShootingHeld = false;
+      };
+      btnFire.addEventListener('touchend', stopFire);
+      btnFire.addEventListener('touchcancel', stopFire);
     }
   }
 
@@ -455,6 +490,17 @@ export class InputManager {
           gpJetpack = true;
         }
 
+        // RT (7) or RB (5): Shoot Ray Gun
+        const gpShootPressed = !!(gp.buttons[7]?.pressed || gp.buttons[5]?.pressed || (gp.buttons[7]?.value && gp.buttons[7].value > 0.3));
+        if (gpShootPressed && !this.prevGamepadShoot) {
+          this.shootJustPressed = true;
+          this.lastInputType = 'gamepad';
+        }
+        if (gpShootPressed) {
+          this.isShootingHeld = true;
+        }
+        this.prevGamepadShoot = gpShootPressed;
+
         // Right stick aim if engaged
         if (Math.hypot(rx, ry) > 0.3) {
           this.isAiming = true;
@@ -519,6 +565,14 @@ export class InputManager {
   public consumeAction(): boolean {
     if (this.actionJustPressed) {
       this.actionJustPressed = false;
+      return true;
+    }
+    return false;
+  }
+
+  public consumeShoot(): boolean {
+    if (this.shootJustPressed) {
+      this.shootJustPressed = false;
       return true;
     }
     return false;

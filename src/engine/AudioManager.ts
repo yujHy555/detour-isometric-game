@@ -491,4 +491,192 @@ export class AudioManager {
       noise.stop(t + 0.55);
     }
   }
+
+  /**
+   * High-tech weapon equip / cocking sound with energy spool-up
+   */
+  public playWeaponEquipped() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // 1. Mechanical slide click
+    const clickOsc = this.ctx.createOscillator();
+    const clickGain = this.ctx.createGain();
+    clickOsc.type = 'triangle';
+    clickOsc.frequency.setValueAtTime(2400, t);
+    clickOsc.frequency.exponentialRampToValueAtTime(800, t + 0.035);
+
+    clickGain.gain.setValueAtTime(0.28, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+
+    clickOsc.connect(clickGain);
+    clickGain.connect(this.ctx.destination);
+    clickOsc.start(t);
+    clickOsc.stop(t + 0.045);
+
+    // 2. Secondary slide lock
+    const lockOsc = this.ctx.createOscillator();
+    const lockGain = this.ctx.createGain();
+    lockOsc.type = 'square';
+    lockOsc.frequency.setValueAtTime(1600, t + 0.08);
+    lockOsc.frequency.exponentialRampToValueAtTime(3200, t + 0.12);
+
+    lockGain.gain.setValueAtTime(0.001, t);
+    lockGain.gain.setValueAtTime(0.22, t + 0.08);
+    lockGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+    lockOsc.connect(lockGain);
+    lockGain.connect(this.ctx.destination);
+    lockOsc.start(t + 0.08);
+    lockOsc.stop(t + 0.15);
+
+    // 3. Energetic plasma chamber spool-up hum
+    const humOsc = this.ctx.createOscillator();
+    const humGain = this.ctx.createGain();
+    humOsc.type = 'sawtooth';
+    humOsc.frequency.setValueAtTime(220, t + 0.12);
+    humOsc.frequency.exponentialRampToValueAtTime(880, t + 0.38);
+
+    const humFilter = this.ctx.createBiquadFilter();
+    humFilter.type = 'lowpass';
+    humFilter.frequency.setValueAtTime(400, t + 0.12);
+    humFilter.frequency.exponentialRampToValueAtTime(1600, t + 0.38);
+
+    humGain.gain.setValueAtTime(0.001, t);
+    humGain.gain.linearRampToValueAtTime(0.25, t + 0.22);
+    humGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+
+    humOsc.connect(humFilter);
+    humFilter.connect(humGain);
+    humGain.connect(this.ctx.destination);
+    humOsc.start(t + 0.12);
+    humOsc.stop(t + 0.48);
+  }
+
+  /**
+   * AAA Sci-Fi Ray Gun Blaster Sound:
+   * Instantaneous high-energy plasma discharge with FM bite, sub-bass kick, and sizzle
+   */
+  public playRayGunShot() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // 1. FM Plasma Laser Carrier + Modulator for crisp sci-fi bite
+    const carrier = this.ctx.createOscillator();
+    const mod = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
+    const carrierGain = this.ctx.createGain();
+
+    carrier.type = 'sawtooth';
+    mod.type = 'sine';
+
+    // High speed downward frequency drop (3200Hz down to 240Hz in 55ms)
+    carrier.frequency.setValueAtTime(3200, t);
+    carrier.frequency.exponentialRampToValueAtTime(240, t + 0.07);
+
+    mod.frequency.setValueAtTime(180, t);
+    modGain.gain.setValueAtTime(450, t);
+    modGain.gain.exponentialRampToValueAtTime(20, t + 0.07);
+
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+
+    carrierGain.gain.setValueAtTime(0.40, t);
+    carrierGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+    carrier.connect(carrierGain);
+    carrierGain.connect(this.ctx.destination);
+
+    carrier.start(t);
+    mod.start(t);
+    carrier.stop(t + 0.13);
+    mod.stop(t + 0.13);
+
+    // 2. Punchy Sub-Bass Kick (110Hz down to 35Hz in 50ms)
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(110, t);
+    subOsc.frequency.exponentialRampToValueAtTime(32, t + 0.06);
+
+    subGain.gain.setValueAtTime(0.48, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 0.09);
+
+    // 3. High-velocity energy beam sizzle discharge
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(3800, t);
+      filter.frequency.exponentialRampToValueAtTime(1200, t + 0.1);
+      filter.Q.setValueAtTime(2.2, t);
+
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.25, t);
+      nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.ctx.destination);
+      noise.start(t);
+      noise.stop(t + 0.12);
+    }
+  }
+
+  /**
+   * Ray impact hit sound: sizzling plasma crackle and surface deflection ping
+   */
+  public playRayImpact() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // Metallic deflection ping
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1600, t);
+    osc.frequency.exponentialRampToValueAtTime(350, t + 0.05);
+
+    gain.gain.setValueAtTime(0.24, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+
+    // Sizzling plasma burst
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(2600, t);
+      filter.Q.setValueAtTime(3.0, t);
+
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.18, t);
+      nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.ctx.destination);
+      noise.start(t);
+      noise.stop(t + 0.09);
+    }
+  }
 }

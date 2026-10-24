@@ -32,6 +32,12 @@ export class CharacterController {
   public isFlying: boolean = false;
   public jetpackUpgraded: boolean = false;
   private flyTimer: number = 0;
+
+  // Ray Gun System & Shooting Animation
+  public hasGun: boolean = false;
+  public gunMesh?: THREE.Object3D;
+  public handBone?: THREE.Bone;
+  private shootAnimTimer: number = 0;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
   private spineBone?: THREE.Bone;
   private jetpackFlamesGroup!: THREE.Group;
@@ -156,6 +162,17 @@ export class CharacterController {
             // Detect upper spine bone to perfectly align jetpack flame angle
             if ((child as THREE.Bone).isBone && child.name.toLowerCase().includes('spine_03')) {
               this.spineBone = child as THREE.Bone;
+            }
+
+            // Detect Atom Ray Gun child on character's right hand
+            if (nameLower.includes('ray gun') || nameLower.includes('atom') || nameLower.includes('gun') || nameLower.includes('pistol')) {
+              this.gunMesh = child;
+              this.gunMesh.visible = this.hasGun;
+              console.log('[CharacterController] Identified Ray Gun mesh on character:', child.name);
+            }
+
+            if ((child as THREE.Bone).isBone && (nameLower === 'hand.r' || nameLower.includes('hand.r'))) {
+              this.handBone = child as THREE.Bone;
             }
 
             if ((child as THREE.Mesh).isMesh) {
@@ -455,6 +472,43 @@ export class CharacterController {
     this.jetpackUpgraded = true;
     if (this.jetpackFlamesGroup) {
       this.jetpackFlamesGroup.scale.set(1.4, 1.4, 1.4);
+    }
+  }
+
+  public equipGun() {
+    this.hasGun = true;
+    if (this.gunMesh) {
+      this.gunMesh.visible = true;
+    }
+    console.log('[CharacterController] Atom Ray Gun equipped into hand.r');
+  }
+
+  public getMuzzlePosition(): THREE.Vector3 {
+    const muzzle = new THREE.Vector3();
+    if (this.gunMesh) {
+      this.gunMesh.getWorldPosition(muzzle);
+      const fwd = new THREE.Vector3(0, 0, 0.45).applyQuaternion(this.group.quaternion);
+      muzzle.add(fwd);
+      return muzzle;
+    }
+    if (this.handBone) {
+      this.handBone.getWorldPosition(muzzle);
+      const fwd = new THREE.Vector3(0, 0, 0.40).applyQuaternion(this.group.quaternion);
+      muzzle.add(fwd);
+      return muzzle;
+    }
+    const chestOffset = new THREE.Vector3(0.25, 0.85, 0.55).applyQuaternion(this.group.quaternion);
+    return this.position.clone().add(chestOffset);
+  }
+
+  public playShootAnimation() {
+    this.shootAnimTimer = 0.32;
+    const shootAction = this.findAction('shoot');
+    if (shootAction) {
+      shootAction.reset();
+      shootAction.setLoop(THREE.LoopOnce, 1);
+      shootAction.clampWhenFinished = false;
+      shootAction.fadeIn(0.04).play();
     }
   }
 
@@ -826,10 +880,18 @@ export class CharacterController {
     }
 
     // Update GLB Mixer Animations
+    if (this.shootAnimTimer > 0) {
+      this.shootAnimTimer -= dt;
+    }
+
     if (this.mixer) {
       this.mixer.update(dt);
       const fadeDuration = this.state === CharacterState.JUMP ? 0.08 : (this.state === CharacterState.FLY ? 0.18 : 0.15);
-      this.playAnimation(this.state, fadeDuration);
+      if (this.shootAnimTimer > 0 && this.state !== CharacterState.JUMP && this.state !== CharacterState.FLY) {
+        // Let shoot animation finish with punchy recoil
+      } else {
+        this.playAnimation(this.state, fadeDuration);
+      }
       if (this.currentAction) {
         if (this.state === CharacterState.RUN) {
           // Dynamic stride match for running: 4.6 m/s base gives perfect foot placement with 0 sliding

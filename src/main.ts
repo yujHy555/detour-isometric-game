@@ -6,6 +6,7 @@ import { IsometricWorld } from './environment/IsometricWorld.ts';
 import { CollectibleManager } from './environment/CollectibleManager.ts';
 import { PlantManager } from './environment/PlantManager.ts';
 import { AudioManager } from './engine/AudioManager.ts';
+import { RayGunSystem } from './engine/RayGunSystem.ts';
 
 class DetourGame {
   private canvas: HTMLCanvasElement;
@@ -17,6 +18,7 @@ class DetourGame {
   private world: IsometricWorld;
   private collectibles: CollectibleManager;
   public plants: PlantManager;
+  public rayGun: RayGunSystem;
   private clock: THREE.Clock;
   private audio: AudioManager;
 
@@ -103,6 +105,36 @@ class DetourGame {
       (x, z, fromY) => this.world.getTerrainHeight(x, z, fromY),
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
+
+    // AAA Atom Ray Gun System & Collectible
+    this.rayGun = new RayGunSystem(
+      this.scene,
+      this.audio,
+      this.character,
+      this.world,
+      this.plants
+    );
+
+    this.rayGun.onGunCollected = () => {
+      // Highlight UI Quick-Slot to active cyan/gold
+      const slotBox = document.getElementById('slot-gun-box');
+      if (slotBox) slotBox.classList.add('active-weapon');
+      const statusEl = document.getElementById('slot-gun-status');
+      if (statusEl) statusEl.textContent = 'READY';
+
+      // Upgrade Announcement Banner
+      const banner = document.getElementById('upgrade-banner');
+      const bannerTitle = banner?.querySelector('.upgrade-banner-title');
+      const bannerDesc = banner?.querySelector('.upgrade-banner-desc');
+      if (banner && bannerTitle && bannerDesc) {
+        bannerTitle.textContent = '✦ ATOM RAY GUN ACQUIRED ✦';
+        bannerDesc.textContent = 'LEFT-CLICK / TAP TO FIRE • AIM WITH MOUSE';
+        banner.classList.add('show');
+        setTimeout(() => {
+          banner.classList.remove('show');
+        }, 4500);
+      }
+    };
 
     // Initial character spawn on Central Plaza
     this.character.position.set(0, 1.0, 0);
@@ -462,6 +494,32 @@ class DetourGame {
           if (upBlipEl.style.display !== 'none') upBlipEl.style.display = 'none';
         }
       }
+
+      // Radar Blip for Atom Ray Gun Collectible
+      const gunBlipIdx = items.length + 1;
+      if (gunBlipIdx < this.radarBlipElements.length) {
+        const gunBlipEl = this.radarBlipElements[gunBlipIdx];
+        if (!this.rayGun.isGunCollected) {
+          const dx = this.rayGun.gunPos.x - this.character.position.x;
+          const dz = this.rayGun.gunPos.z - this.character.position.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < maxRadarWorldDist) {
+            const scale = dist / maxRadarWorldDist;
+            const angle = Math.atan2(dz, dx) + Math.PI / 4;
+            const blipX = 72 + Math.cos(angle) * (scale * radarRadius);
+            const blipY = 72 + Math.sin(angle) * (scale * radarRadius);
+
+            if (gunBlipEl.style.display !== 'block') gunBlipEl.style.display = 'block';
+            gunBlipEl.className = 'radar-blip radar-blip-gun';
+            gunBlipEl.style.left = `${blipX.toFixed(1)}px`;
+            gunBlipEl.style.top = `${blipY.toFixed(1)}px`;
+          } else {
+            if (gunBlipEl.style.display !== 'none') gunBlipEl.style.display = 'none';
+          }
+        } else {
+          if (gunBlipEl.style.display !== 'none') gunBlipEl.style.display = 'none';
+        }
+      }
     }
   }
 
@@ -516,13 +574,19 @@ class DetourGame {
       (x, z, fromY) => this.world.getTerrainNormal(x, z, fromY)
     );
 
-    // 4. Update Cyber Energy Core Collectibles
+    // 4. Ray Gun Shooting System & Dynamic VFX
+    if (this.inputManager.consumeShoot() || (this.inputManager.isShootingHeld && this.character.hasGun)) {
+      this.rayGun.shoot(this.inputManager.mouseWorldTarget);
+    }
+    this.rayGun.update(dt);
+
+    // 5. Update Cyber Energy Core Collectibles
     this.collectibles.update(this.character.position, dt);
 
-    // 5. Update Isometric Camera Tracking
+    // 6. Update Isometric Camera Tracking
     this.cameraSystem.update(this.character.position, dt);
 
-    // 6. Render Scene
+    // 7. Render Scene
     this.renderer.render(this.scene, this.cameraSystem.camera);
   }
 }

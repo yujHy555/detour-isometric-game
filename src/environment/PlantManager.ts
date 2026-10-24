@@ -161,6 +161,10 @@ export class PlantManager {
     return pos;
   }
 
+  public getGroup(): THREE.Group {
+    return this.group;
+  }
+
   /**
    * Generates organic plant spawn locations across the open terrain floor.
    * Strictly excludes Central Plaza, all platforms, ramps, and sky platform footprints
