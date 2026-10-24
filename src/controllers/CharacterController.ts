@@ -706,11 +706,12 @@ export class CharacterController {
 
   /**
    * Applies Frame 1 of shooting animation across all right arm, shoulder, and hand bones.
-   * Completely eliminates arm twist and points gun straight ahead as authored in the animation.
+   * Completely eliminates arm twist and compensates for spine slouch/sway so the gun and emitter always point dead straight forward.
    */
   public applyShootingArmPose() {
     if (this.aimStanceWeight <= 0.005) return;
 
+    // 1. Pose right arm bones into Frame 1 base transforms
     for (const [key, bone] of this.rightArmBones.entries()) {
       const target = FRAME1_RIGHT_ARM_POSE[key];
       if (target) {
@@ -718,6 +719,32 @@ export class CharacterController {
         if (target.position) {
           bone.position.lerp(target.position, this.aimStanceWeight);
         }
+      }
+    }
+
+    // 2. Active spine-lean compensation on shoulder.r:
+    // Ensures barrel emitter aims dead straight forward (0, 0, 1) relative to character orientation
+    const shoulder = this.rightArmBones.get('shoulderr');
+    if (shoulder && shoulder.parent && this.gunEmitterNode) {
+      this.gunEmitterNode.updateWorldMatrix(true, false);
+      const eq = new THREE.Quaternion();
+      this.gunEmitterNode.getWorldQuaternion(eq);
+      const currentBarrelDir = new THREE.Vector3(0, 0, 1).applyQuaternion(eq).normalize();
+
+      // Target direction: exactly straight forward in world space according to character group
+      const targetDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion).normalize();
+
+      if (currentBarrelDir.dot(targetDir) > 0.1) {
+        const deltaQ = new THREE.Quaternion().setFromUnitVectors(currentBarrelDir, targetDir);
+        const shoulderWorldQ = new THREE.Quaternion();
+        shoulder.getWorldQuaternion(shoulderWorldQ);
+        const newShoulderWorldQ = deltaQ.multiply(shoulderWorldQ);
+
+        const parentWorldQ = new THREE.Quaternion();
+        shoulder.parent.getWorldQuaternion(parentWorldQ);
+        const newLocalQ = parentWorldQ.invert().multiply(newShoulderWorldQ);
+
+        shoulder.quaternion.slerp(newLocalQ, this.aimStanceWeight);
       }
     }
 
@@ -733,6 +760,7 @@ export class CharacterController {
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
     this.aimStanceWeight = 1.0;
+    this.group.updateMatrixWorld(true);
     this.applyShootingArmPose();
 
     const shootAction = this.shootAction || this.findAction('root|_shooting_01.001') || this.findAction('shoot');
