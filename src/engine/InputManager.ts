@@ -15,6 +15,7 @@ export interface GamepadUIState {
 
 export class InputManager {
   private keys: Record<string, boolean> = {};
+  private shiftDown: boolean = false;
   public moveVector: THREE.Vector3 = new THREE.Vector3();
   public mouseWorldTarget: THREE.Vector3 = new THREE.Vector3();
   public hasMouse: boolean = false;
@@ -59,6 +60,7 @@ export class InputManager {
   constructor() {
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.onKeyUp(e));
+    window.addEventListener('blur', () => this.resetKeys());
     window.addEventListener('mousemove', (e) => this.onMouseMove(e));
     window.addEventListener('mousedown', (e) => this.onMouseDown(e));
     window.addEventListener('mouseup', (e) => this.onMouseUp(e));
@@ -93,20 +95,24 @@ export class InputManager {
     }
   }
 
+  private resetKeys() {
+    this.keys = {};
+    this.shiftDown = false;
+    this.jumpJustPressed = false;
+    this.jumpBufferTimer = 0;
+  }
+
   private onKeyDown(e: KeyboardEvent) {
     this.lastInputType = 'keyboard';
     this.keys[e.code] = true;
-    if (e.key) {
-      this.keys[e.key] = true;
-      this.keys[e.key.toLowerCase()] = true;
+    if (e.shiftKey || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      this.shiftDown = true;
     }
 
     // Comprehensive jump inputs: Space, Left Alt, Right Alt, C, V, J, K, Numpad0
     // Left Alt and C reside on separate matrix lines from W+A, completely bypassing hardware keyboard ghosting
     const isJumpKey = (
       e.code === 'Space' ||
-      e.key === ' ' ||
-      e.keyCode === 32 ||
       e.code === 'AltLeft' ||
       e.code === 'AltRight' ||
       e.code === 'KeyC' ||
@@ -122,17 +128,14 @@ export class InputManager {
       this.jumpBufferTimer = 0.22; // 220ms input buffer
     }
 
-    if (e.code === 'KeyE' || e.code === 'KeyF' || e.key === 'e' || e.key === 'f') {
+    if (e.code === 'KeyE' || e.code === 'KeyF') {
       this.actionJustPressed = true;
     }
   }
 
   private onKeyUp(e: KeyboardEvent) {
     this.keys[e.code] = false;
-    if (e.key) {
-      this.keys[e.key] = false;
-      this.keys[e.key.toLowerCase()] = false;
-    }
+    this.shiftDown = e.shiftKey;
   }
 
   private onMouseMove(e: MouseEvent) {
@@ -268,13 +271,13 @@ export class InputManager {
 
     let screenX = 0;
     let screenZ = 0;
-    let sprintPressed = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.touchSprintActive);
+    let sprintPressed = this.shiftDown || !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.touchSprintActive);
 
-    // 1. Keyboard Inputs
-    if (this.keys['KeyA'] || this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) screenX -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) screenX += 1;
-    if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.keys['w'] || this.keys['W']) screenZ -= 1;
-    if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.keys['s'] || this.keys['S']) screenZ += 1;
+    // 1. Keyboard Inputs (Clean scancode based - never gets stuck when pressing or releasing Shift)
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) screenX -= 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) screenX += 1;
+    if (this.keys['KeyW'] || this.keys['ArrowUp']) screenZ -= 1;
+    if (this.keys['KeyS'] || this.keys['ArrowDown']) screenZ += 1;
 
     // 2. Touch Joystick Input
     if (this.touchActive) {
