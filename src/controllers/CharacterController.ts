@@ -43,8 +43,6 @@ export class CharacterController {
   public handBone?: THREE.Bone;
   private shootAnimTimer: number = 0;
   private shootAction?: THREE.AnimationAction;
-  private aimStanceWeight: number = 0;
-  private recoilTimer: number = 0;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
   private spineBone?: THREE.Bone;
   private jetpackFlamesGroup!: THREE.Group;
@@ -254,22 +252,36 @@ export class CharacterController {
             for (const clip of gltf.animations) {
               const name = clip.name.toLowerCase();
               if (name.includes('shoot')) {
-                // Isolate tracks affecting only the right arm bones (shoulder, arm, forearm, hand, fingers, weapon)
-                const rightArmTracks = clip.tracks.filter(track => {
+                // Isolate tracks for all right arm, shoulder, and hand bones strictly using Frame 1 (t = 0)
+                const frame1Tracks: THREE.KeyframeTrack[] = [];
+                for (const track of clip.tracks) {
                   const boneName = track.name.slice(0, track.name.lastIndexOf('.'));
-                  return this.isRightArmBone(boneName);
-                });
+                  if (this.isRightArmBone(boneName)) {
+                    const stride = track.values.length / track.times.length;
+                    const frame1Val = Array.from(track.values.slice(0, stride));
+                    let staticTrack: THREE.KeyframeTrack;
+                    if (track instanceof THREE.QuaternionKeyframeTrack || track.name.endsWith('.quaternion')) {
+                      staticTrack = new THREE.QuaternionKeyframeTrack(track.name, [0, 1], [...frame1Val, ...frame1Val]);
+                    } else if (track instanceof THREE.VectorKeyframeTrack || track.name.endsWith('.position') || track.name.endsWith('.scale')) {
+                      staticTrack = new THREE.VectorKeyframeTrack(track.name, [0, 1], [...frame1Val, ...frame1Val]);
+                    } else {
+                      staticTrack = new THREE.NumberKeyframeTrack(track.name, [0, 1], [...frame1Val, ...frame1Val]);
+                    }
+                    frame1Tracks.push(staticTrack);
+                  }
+                }
+
                 const maskedShootClip = new THREE.AnimationClip(
-                  'shoot_right_arm',
-                  clip.duration,
-                  rightArmTracks
+                  'shoot_right_arm_frame1',
+                  1.0,
+                  frame1Tracks
                 );
                 this.shootAction = this.mixer.clipAction(maskedShootClip);
                 this.shootAction.loop = THREE.LoopOnce;
                 this.shootAction.clampWhenFinished = true;
                 this.actions.set('shoot', this.shootAction);
-                clipNames.push(clip.name + ' [Right Arm Layered]');
-                console.log(`[CharacterController] Registered masked right-arm shoot action with ${rightArmTracks.length} tracks`);
+                clipNames.push(clip.name + ' [Frame 1 Right Arm]');
+                console.log(`[CharacterController] Registered Frame 1 shoot action with ${frame1Tracks.length} right arm tracks`);
                 continue;
               }
 
@@ -601,54 +613,17 @@ export class CharacterController {
     return this.position.clone().add(chestOffset);
   }
 
-  public applyProceduralAimStance() {
-    if (this.aimStanceWeight <= 0.005) return;
-
-    const recoilFraction = this.recoilTimer > 0 ? (this.recoilTimer / 0.12) : 0;
-    const recoilPitch = Math.sin(recoilFraction * Math.PI) * 0.22; // Punchy 12.5 deg tactile recoil
-
-    if (this.upperArmBone) {
-      // Horizontal forward aim posture (ax: -170 deg, az: 80 deg)
-      const targetArmQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(-170 * (Math.PI / 180) + recoilPitch * 0.4, 0, 80 * (Math.PI / 180))
-      );
-      this.upperArmBone.quaternion.slerp(targetArmQuat, this.aimStanceWeight);
-    }
-    if (this.forearmBone) {
-      // Forearm twist (Y = 160 deg) rotates the right hand and palm directly toward the sky
-      const targetForearmQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, 160 * (Math.PI / 180), recoilPitch * 0.25)
-      );
-      this.forearmBone.quaternion.slerp(targetForearmQuat, this.aimStanceWeight);
-    }
-    if (this.handBone) {
-      // Hand wrist offset (Z = -30 deg) aligns the barrel straight forward while palm faces the sky
-      const targetHandQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(recoilPitch, 0, -30 * (Math.PI / 180))
-      );
-      this.handBone.quaternion.slerp(targetHandQuat, this.aimStanceWeight);
-    }
-
-    if (this.modelMesh) {
-      this.modelMesh.updateMatrixWorld(true);
-    }
-    if (this.gunEmitterNode) {
-      this.gunEmitterNode.updateWorldMatrix(true, false);
-    }
-  }
-
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
-    this.recoilTimer = 0.12;
-    this.aimStanceWeight = 1.0; // Snap stance weight to 1.0 immediately on trigger pull
-    this.applyProceduralAimStance(); // Ensure barrel and empty_gun_emitter are in forward aim position before ray emits
-
     const shootAction = this.shootAction || this.findAction('shoot');
     if (shootAction) {
       shootAction.reset();
       shootAction.setEffectiveTimeScale(1.0);
       shootAction.setEffectiveWeight(50.0);
       shootAction.play();
+    }
+    if (this.gunEmitterNode) {
+      this.gunEmitterNode.updateWorldMatrix(true, false);
     }
   }
 
@@ -991,18 +966,12 @@ export class CharacterController {
       (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.65 - heightAboveGround * 0.1, 0.1, 0.65);
     }
 
-    // Layered Upper-Body Shoot Animation Decay & Procedural Aim Blend
+    // Layered Upper-Body Shoot Animation (Frame 1) Decay
     if (this.shootAnimTimer > 0) {
       this.shootAnimTimer -= dt;
-      this.aimStanceWeight = THREE.MathUtils.lerp(this.aimStanceWeight, 1.0, dt * 25.0);
       if (this.shootAnimTimer <= 0 && this.shootAction) {
-        (this.shootAction as any)._scheduleFading(0.08, this.shootAction.getEffectiveWeight(), 0);
+        (this.shootAction as any)._scheduleFading(0.10, this.shootAction.getEffectiveWeight(), 0);
       }
-    } else {
-      this.aimStanceWeight = THREE.MathUtils.lerp(this.aimStanceWeight, 0.0, dt * 10.0);
-    }
-    if (this.recoilTimer > 0) {
-      this.recoilTimer = Math.max(0, this.recoilTimer - dt);
     }
 
     // 5. Animation State Machine (Jetpack -> Jump/Fall -> Walk/Run -> Idle)
@@ -1040,9 +1009,6 @@ export class CharacterController {
           this.currentAction.timeScale = 1.0;
         }
       }
-
-      // 6. Procedural AAA Forward Aim Stance & Recoil Kick (Puts right arm fully into shooting position with palm facing sky)
-      this.applyProceduralAimStance();
     }
   }
 }

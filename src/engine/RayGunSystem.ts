@@ -453,9 +453,8 @@ export class RayGunSystem {
 
     this.cooldown = this.fireRate;
 
-    // 1. Play shooting animation and apply procedural forward aim stance
+    // 1. Play Frame 1 shooting action across right arm, shoulder, and hand bones
     this.character.playShootAnimation();
-    this.character.applyProceduralAimStance();
     this.character.group.updateMatrixWorld(true);
 
     // 2. Obtain exact physical barrel muzzle position from empty_gun_emitter in world space
