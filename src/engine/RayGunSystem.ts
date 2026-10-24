@@ -457,26 +457,22 @@ export class RayGunSystem {
     this.character.playShootAnimation();
     this.character.group.updateMatrixWorld(true);
 
-    // 2. Obtain exact physical barrel muzzle position from empty_gun_emitter in world space
-    const muzzlePos = this.character.getMuzzlePosition();
+    // 2. Obtain exact physical barrel muzzle position and 3D barrel direction from empty_gun_emitter
+    // (Accurately follows character orientation and full 3D pitch/bank tilt during flight)
+    const { position: muzzlePos, direction: aimDir } = this.character.getMuzzlePositionAndDirection();
 
-    // 3. The straight forward direction the player is standing in:
-    const rotY = this.character.group.rotation.y;
-    const forwardDir = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)).normalize();
-    const aimDir = forwardDir;
+    // 3. Physical recoil impulse pushes character slightly backward opposite to aim direction
+    this.character.velocity.addScaledVector(aimDir, -0.65);
 
-    // 4. Physical recoil impulse pushes character slightly backward opposite to facing direction
-    this.character.velocity.addScaledVector(forwardDir, -0.65);
-
-    // 5. Audio Firing Sound
+    // 4. Audio Firing Sound
     try {
       this.audio.playRayGunShot();
     } catch {
       // Audio fallback
     }
 
-    // 6. Ray shoots straight forward from the barrel tip in the direction the player is standing
-    this.raycaster.set(muzzlePos, forwardDir);
+    // 5. Ray shoots straight from the barrel empty at the exact 3D barrel angle
+    this.raycaster.set(muzzlePos, aimDir);
     this.raycaster.far = 60.0;
 
     const colliders: THREE.Object3D[] = [...this.world.terrainColliders, this.plants.getGroup()];

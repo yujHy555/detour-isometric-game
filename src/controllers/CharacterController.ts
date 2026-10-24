@@ -43,6 +43,7 @@ export class CharacterController {
   public handBone?: THREE.Bone;
   private shootAnimTimer: number = 0;
   private shootAction?: THREE.AnimationAction;
+  private aimStanceWeight: number = 0;
   private thrusterParticles: { mesh: THREE.Mesh; vx: number; vy: number; vz: number; timer: number; maxTime: number }[] = [];
   private spineBone?: THREE.Bone;
   private jetpackFlamesGroup!: THREE.Group;
@@ -586,35 +587,84 @@ export class CharacterController {
   }
 
   public getMuzzlePosition(): THREE.Vector3 {
-    // 1. Precise empty_gun_emitter added by user at tip of barrel
+    return this.getMuzzlePositionAndDirection().position;
+  }
+
+  /**
+   * Retrieves the exact 3D muzzle position and barrel direction directly from empty_gun_emitter.
+   * Accurately tracks character orientation and 3D flight angles (pitch/bank) while flying.
+   */
+  public getMuzzlePositionAndDirection(): { position: THREE.Vector3; direction: THREE.Vector3 } {
     if (this.gunEmitterNode) {
-      this.gunEmitterNode.updateMatrixWorld(true);
-      const muzzlePos = new THREE.Vector3();
-      this.gunEmitterNode.getWorldPosition(muzzlePos);
-      return muzzlePos;
+      this.gunEmitterNode.updateWorldMatrix(true, false);
+      const position = new THREE.Vector3();
+      this.gunEmitterNode.getWorldPosition(position);
+
+      const eq = new THREE.Quaternion();
+      this.gunEmitterNode.getWorldQuaternion(eq);
+      // The gun barrel points along local +Z of empty_gun_emitter
+      const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(eq).normalize();
+
+      return { position, direction };
     }
-    // 2. Fallback to gunMesh tip
+
+    // Fallback if emitter not yet resolved
+    const rotY = this.group.rotation.y;
+    const direction = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)).normalize();
     if (this.gunMesh) {
       this.gunMesh.updateMatrixWorld(true);
       const muzzleLocal = new THREE.Vector3(0, 0.0086, 0.1232);
       const worldPos = muzzleLocal.clone();
       this.gunMesh.localToWorld(worldPos);
-      return worldPos;
+      return { position: worldPos, direction };
     }
-    // 3. Fallback to hand bone
     if (this.handBone) {
       const muzzle = new THREE.Vector3();
       this.handBone.getWorldPosition(muzzle);
       const fwd = new THREE.Vector3(0, 0, 0.40).applyQuaternion(this.group.quaternion);
       muzzle.add(fwd);
-      return muzzle;
+      return { position: muzzle, direction };
     }
     const chestOffset = new THREE.Vector3(0.25, 0.85, 0.55).applyQuaternion(this.group.quaternion);
-    return this.position.clone().add(chestOffset);
+    return { position: this.position.clone().add(chestOffset), direction };
+  }
+
+  /**
+   * Poses the right arm straight out in front pointing the gun straight
+   */
+  public applyStraightArmPose() {
+    if (this.aimStanceWeight <= 0.005) return;
+
+    if (this.upperArmBone) {
+      // Extends right arm straight out in front at shoulder height
+      const targetArmQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(-160 * (Math.PI / 180), 0, 98 * (Math.PI / 180))
+      );
+      this.upperArmBone.quaternion.slerp(targetArmQuat, this.aimStanceWeight);
+    }
+    if (this.forearmBone) {
+      const targetForearmQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, 0, 0)
+      );
+      this.forearmBone.quaternion.slerp(targetForearmQuat, this.aimStanceWeight);
+    }
+    if (this.handBone) {
+      const targetHandQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, 0, 0)
+      );
+      this.handBone.quaternion.slerp(targetHandQuat, this.aimStanceWeight);
+    }
+
+    if (this.gunEmitterNode) {
+      this.gunEmitterNode.updateWorldMatrix(true, false);
+    }
   }
 
   public playShootAnimation() {
     this.shootAnimTimer = 0.35;
+    this.aimStanceWeight = 1.0;
+    this.applyStraightArmPose();
+
     const shootAction = this.shootAction || this.findAction('shoot');
     if (shootAction) {
       shootAction.reset();
@@ -966,12 +1016,15 @@ export class CharacterController {
       (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(0.65 - heightAboveGround * 0.1, 0.1, 0.65);
     }
 
-    // Layered Upper-Body Shoot Animation (Frame 1) Decay
+    // Layered Upper-Body Shoot Animation (Straight Forward Aim) Decay
     if (this.shootAnimTimer > 0) {
       this.shootAnimTimer -= dt;
+      this.aimStanceWeight = THREE.MathUtils.lerp(this.aimStanceWeight, 1.0, dt * 25.0);
       if (this.shootAnimTimer <= 0 && this.shootAction) {
-        (this.shootAction as any)._scheduleFading(0.10, this.shootAction.getEffectiveWeight(), 0);
+        (this.shootAction as any)._scheduleFading(0.12, this.shootAction.getEffectiveWeight(), 0);
       }
+    } else {
+      this.aimStanceWeight = THREE.MathUtils.lerp(this.aimStanceWeight, 0.0, dt * 10.0);
     }
 
     // 5. Animation State Machine (Jetpack -> Jump/Fall -> Walk/Run -> Idle)
@@ -1009,6 +1062,9 @@ export class CharacterController {
           this.currentAction.timeScale = 1.0;
         }
       }
+
+      // 6. Straight Forward Arm Pose (Extends right arm straight out in front pointing gun straight)
+      this.applyStraightArmPose();
     }
   }
 }
