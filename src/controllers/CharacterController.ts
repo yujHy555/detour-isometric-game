@@ -232,7 +232,9 @@ export class CharacterController {
             // Detect Atom Ray Gun child on character's right hand
             if (nameLower.includes('ray gun') || nameLower.includes('atom') || (nameLower.includes('gun') && !nameLower.includes('emitter')) || nameLower.includes('pistol')) {
               this.gunMesh = child;
-              this.gunMesh.visible = this.hasGun;
+              // Pre-warm shader with microscopic scale so there is ZERO shader compilation freeze when picking up gun
+              this.gunMesh.visible = true;
+              this.gunMesh.scale.set(this.hasGun ? 1.0 : 0.0001, this.hasGun ? 1.0 : 0.0001, this.hasGun ? 1.0 : 0.0001);
               console.log('[CharacterController] Identified Ray Gun mesh on character:', child.name);
             }
 
@@ -375,6 +377,15 @@ export class CharacterController {
             if (statusEl) {
               statusEl.textContent = `Active GLB: [${clipNames.join(', ')}]`;
               statusEl.style.color = '#00f0ff';
+            }
+
+            // Warm up shootAction interpolators in mixer so first shot does not hitch
+            if (this.shootAction) {
+              this.shootAction.play();
+              this.shootAction.setEffectiveWeight(0.0001);
+              this.mixer.update(0.001);
+              this.shootAction.stop();
+              this.shootAction.setEffectiveWeight(1.0);
             }
 
             this.playAnimation(CharacterState.IDLE);
@@ -654,6 +665,7 @@ export class CharacterController {
     this.hasGun = true;
     if (this.gunMesh) {
       this.gunMesh.visible = true;
+      this.gunMesh.scale.set(1.0, 1.0, 1.0);
     }
     if (this.gunEmitterNode) {
       this.gunEmitterNode.visible = true;

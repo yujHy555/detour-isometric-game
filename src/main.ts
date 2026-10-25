@@ -176,6 +176,14 @@ class DetourGame {
 
     this.initMenuParticles();
     this.setupUIHandlers();
+
+    // Pre-compile scene and shaders to prevent any stutter or hitches during gameplay
+    try {
+      this.renderer.compile(this.scene, this.cameraSystem.camera);
+    } catch {
+      // Fallback
+    }
+
     window.addEventListener('resize', () => this.onResize());
 
     // Start render loop
@@ -602,7 +610,7 @@ class DetourGame {
       (pos, radius) => {
         this.world.resolveHorizontalCollision(pos, radius);
         this.plants.resolveCollisions(pos, radius);
-        this.rayGun.resolveCharacterCollision(pos, radius);
+        this.rayGun.resolveCharacterCollision(pos, radius, this.character.velocity);
         return pos;
       },
       (pos, vel, h) => this.world.resolveCeilingCollision(pos, vel, h),

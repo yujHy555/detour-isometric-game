@@ -740,4 +740,95 @@ export class AudioManager {
       noise.stop(t + 0.4);
     }
   }
+
+  /**
+   * Sci-Fi ball kick / impact when player walks or sprints into a yellow ball
+   */
+  public playBallKick(speed: number = 3.0) {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+    const vol = Math.min(0.45, 0.15 + (speed / 10.0) * 0.25);
+
+    // Punchy rubbery thud
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
+
+  /**
+   * Physical ball bounce sound when bouncing off terrain or obstacles
+   */
+  public playBallBounce(velocity: number = 2.0) {
+    this.resume();
+    if (!this.ctx || this.isMuted || velocity < 0.6) return;
+
+    const t = this.ctx.currentTime;
+    const vol = Math.min(0.35, 0.08 + (velocity / 12.0) * 0.22);
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140 + Math.min(100, velocity * 15), t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.09);
+
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.11);
+  }
+
+  /**
+   * High-energy kinetic blast impact when ray gun blasts a physical ball
+   */
+  public playRayGunBlastImpact() {
+    this.resume();
+    if (!this.ctx || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // Sub kick
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'triangle';
+    subOsc.frequency.setValueAtTime(260, t);
+    subOsc.frequency.exponentialRampToValueAtTime(40, t + 0.20);
+
+    subGain.gain.setValueAtTime(0.55, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.ctx.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 0.23);
+
+    // Crackle snap
+    const snapOsc = this.ctx.createOscillator();
+    const snapGain = this.ctx.createGain();
+    snapOsc.type = 'sawtooth';
+    snapOsc.frequency.setValueAtTime(1400, t);
+    snapOsc.frequency.exponentialRampToValueAtTime(180, t + 0.08);
+
+    snapGain.gain.setValueAtTime(0.35, t);
+    snapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+
+    snapOsc.connect(snapGain);
+    snapGain.connect(this.ctx.destination);
+    snapOsc.start(t);
+    snapOsc.stop(t + 0.11);
+  }
 }
