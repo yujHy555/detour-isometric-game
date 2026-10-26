@@ -79,8 +79,9 @@ export class CharacterController {
 
   // Visual Meshes & Loading
   private modelMesh?: THREE.Group;
+  private placeholderMesh?: THREE.Group;
   private shadowMesh!: THREE.Mesh;
-  public isLoaded: boolean = false;
+  public isLoaded: boolean = true;
 
   // Custom GLB Animation Mixer
   private mixer?: THREE.AnimationMixer;
@@ -138,12 +139,121 @@ export class CharacterController {
     this.sceneRef = scene;
     this.audio = audio || new AudioManager();
     this.group = new THREE.Group();
-    this.group.visible = false;
+    this.group.visible = true;
     scene.add(this.group);
+
+    // Create immediate stylish procedural avatar so character is 100% visible and playable on frame 0
+    this.placeholderMesh = this.createPlaceholderAvatar();
+    this.group.add(this.placeholderMesh);
 
     this.createContactShadow(scene);
     this.createJetpackFlames(scene);
     this.attemptLoadCustomModel();
+  }
+
+  /**
+   * High-detail procedural astronaut scout avatar that renders instantly while character.glb downloads in background.
+   */
+  private createPlaceholderAvatar(): THREE.Group {
+    const avatar = new THREE.Group();
+    avatar.name = 'PlaceholderAvatar';
+
+    // Body suit material
+    const suitMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.45,
+      metalness: 0.35
+    });
+
+    // Accent armor material
+    const armorMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      roughness: 0.3,
+      metalness: 0.6
+    });
+
+    // Glowing cyan visor
+    const visorMat = new THREE.MeshStandardMaterial({
+      color: 0x00f0ff,
+      emissive: 0x00f0ff,
+      emissiveIntensity: 1.6,
+      roughness: 0.1,
+      metalness: 0.9
+    });
+
+    // 1. Torso
+    const torsoGeo = new THREE.CylinderGeometry(0.24, 0.19, 0.65, 12);
+    const torso = new THREE.Mesh(torsoGeo, suitMat);
+    torso.position.y = 0.95;
+    torso.castShadow = true;
+    avatar.add(torso);
+
+    // Chest armor plate
+    const chestGeo = new THREE.BoxGeometry(0.36, 0.34, 0.22);
+    const chest = new THREE.Mesh(chestGeo, armorMat);
+    chest.position.set(0, 1.02, 0.08);
+    chest.castShadow = true;
+    avatar.add(chest);
+
+    // 2. Helmet & Visor
+    const helmetGeo = new THREE.SphereGeometry(0.23, 14, 12);
+    const helmet = new THREE.Mesh(helmetGeo, suitMat);
+    helmet.position.y = 1.48;
+    helmet.castShadow = true;
+    avatar.add(helmet);
+
+    const visorGeo = new THREE.SphereGeometry(0.18, 12, 12, 0, Math.PI, 0, Math.PI / 2);
+    const visor = new THREE.Mesh(visorGeo, visorMat);
+    visor.position.set(0, 1.48, 0.12);
+    visor.rotation.x = -Math.PI / 5;
+    avatar.add(visor);
+
+    // 3. Jetpack Unit
+    const packGeo = new THREE.BoxGeometry(0.32, 0.42, 0.18);
+    const pack = new THREE.Mesh(packGeo, armorMat);
+    pack.position.set(0, 1.08, -0.22);
+    pack.castShadow = true;
+    avatar.add(pack);
+
+    // 4. Legs
+    const legGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.62, 8);
+    const legL = new THREE.Mesh(legGeo, suitMat);
+    legL.position.set(-0.13, 0.34, 0);
+    legL.castShadow = true;
+    avatar.add(legL);
+
+    const legR = new THREE.Mesh(legGeo, suitMat);
+    legR.position.set(0.13, 0.34, 0);
+    legR.castShadow = true;
+    avatar.add(legR);
+
+    // Boots
+    const bootGeo = new THREE.BoxGeometry(0.15, 0.12, 0.24);
+    const bootL = new THREE.Mesh(bootGeo, armorMat);
+    bootL.position.set(-0.13, 0.06, 0.04);
+    bootL.castShadow = true;
+    avatar.add(bootL);
+
+    const bootR = new THREE.Mesh(bootGeo, armorMat);
+    bootR.position.set(0.13, 0.06, 0.04);
+    bootR.castShadow = true;
+    avatar.add(bootR);
+
+    // 5. Placeholder Ray Gun (attached to right arm)
+    const gunGroup = new THREE.Group();
+    gunGroup.name = 'placeholderGun';
+    gunGroup.position.set(0.32, 0.95, 0.28);
+    gunGroup.visible = this.hasGun;
+
+    const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.34), suitMat);
+    gunGroup.add(gunBody);
+    const gunCore = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 8), visorMat);
+    gunCore.rotation.x = Math.PI / 2;
+    gunCore.position.set(0, 0.02, 0.05);
+    gunGroup.add(gunCore);
+    avatar.add(gunGroup);
+
+    return avatar;
   }
 
   private createContactShadow(scene: THREE.Scene) {
@@ -232,10 +342,8 @@ export class CharacterController {
             // Detect Atom Ray Gun child on character's right hand
             if (nameLower.includes('ray gun') || nameLower.includes('atom') || (nameLower.includes('gun') && !nameLower.includes('emitter')) || nameLower.includes('pistol')) {
               this.gunMesh = child;
-              // Pre-warm shader with microscopic scale so there is ZERO shader compilation freeze when picking up gun
-              this.gunMesh.visible = true;
-              this.gunMesh.scale.set(this.hasGun ? 1.0 : 0.0001, this.hasGun ? 1.0 : 0.0001, this.hasGun ? 1.0 : 0.0001);
-              console.log('[CharacterController] Identified Ray Gun mesh on character:', child.name);
+              this.gunMesh.visible = this.hasGun;
+              console.log('[CharacterController] Identified Ray Gun mesh on character:', child.name, 'visible:', this.hasGun);
             }
 
             // Detect empty_gun_emitter on tip of the gun barrel
@@ -304,6 +412,18 @@ export class CharacterController {
               }
             }
           });
+          if (this.placeholderMesh) {
+            this.group.remove(this.placeholderMesh);
+            this.placeholderMesh.traverse((c) => {
+              if ((c as THREE.Mesh).geometry) (c as THREE.Mesh).geometry.dispose();
+              if ((c as THREE.Mesh).material) {
+                const mat = (c as THREE.Mesh).material;
+                if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+                else mat.dispose();
+              }
+            });
+            this.placeholderMesh = undefined;
+          }
           this.group.add(this.modelMesh);
 
           // Smooth drop-in entrance when fully loaded: drops gently from sky onto Central Plaza
@@ -665,10 +785,13 @@ export class CharacterController {
     this.hasGun = true;
     if (this.gunMesh) {
       this.gunMesh.visible = true;
-      this.gunMesh.scale.set(1.0, 1.0, 1.0);
     }
     if (this.gunEmitterNode) {
       this.gunEmitterNode.visible = true;
+    }
+    if (this.placeholderMesh) {
+      const pGun = this.placeholderMesh.getObjectByName('placeholderGun');
+      if (pGun) pGun.visible = true;
     }
     console.log('[CharacterController] Atom Ray Gun equipped into hand.r');
   }
@@ -1039,20 +1162,20 @@ export class CharacterController {
 
     // Real-Time 2.5D Capsule Obstacle Collision (Smooth Wall Sliding & Zero Clipping)
     if (resolveCollision) {
-      const effectiveRadius = this.isFlying ? 0.48 : this.bodyRadius;
+      const effectiveRadius = this.isFlying ? 0.52 : this.bodyRadius;
       resolveCollision(this.position, effectiveRadius);
 
-      // Dedicated head/helmet collision check when flying to prevent tilted helmet clipping
+      // Dedicated head/helmet collision check when flying to prevent tilted helmet clipping into walls/platforms
       if (this.isFlying) {
-        const forwardX = -Math.sin(this.group.rotation.y);
-        const forwardZ = -Math.cos(this.group.rotation.y);
-        const headOffset = 0.35;
+        const forwardX = Math.sin(this.group.rotation.y);
+        const forwardZ = Math.cos(this.group.rotation.y);
+        const headOffset = 0.55;
         const headPos = new THREE.Vector3(
           this.position.x + forwardX * headOffset,
-          this.position.y,
+          this.position.y + 0.35,
           this.position.z + forwardZ * headOffset
         );
-        resolveCollision(headPos, 0.32);
+        resolveCollision(headPos, 0.45);
         this.position.x = headPos.x - forwardX * headOffset;
         this.position.z = headPos.z - forwardZ * headOffset;
       }

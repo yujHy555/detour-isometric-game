@@ -483,7 +483,7 @@ export class IsometricWorld {
     pos.z = THREE.MathUtils.clamp(pos.z, -maxBound, maxBound);
 
     // 2. Central Plaza Walls (Plaza: x: [-8, 8], z: [-8, 8], height 1.0)
-    if (pos.y < 0.85) {
+    if (pos.y < 0.98) {
       const atRampEntrance = Math.abs(pos.x) <= 2.5 && pos.z >= 7.8;
       if (!atRampEntrance) {
         this.resolveBox(pos, radius, -8, 8, -8, 8);
@@ -502,12 +502,12 @@ export class IsometricWorld {
     }
 
     // 5. Elevated Platform 1 (-12, 2.0, -8, size 8x8) -> bounds [-16, -8], [-12, -4]
-    if (pos.y < 1.85) {
+    if (pos.y < 1.98) {
       this.resolveBox(pos, radius, -16, -8, -12, -4);
     }
 
     // 6. Elevated Platform 2 (14, 1.5, 10, size 10x6) -> bounds [9, 19], [7, 13]
-    if (pos.y < 1.35) {
+    if (pos.y < 1.48) {
       const onRamp2 = pos.x >= 11.8 && pos.x <= 16.2 && pos.z >= 12.8;
       if (!onRamp2) {
         this.resolveBox(pos, radius, 9, 19, 7, 13);
@@ -515,13 +515,13 @@ export class IsometricWorld {
     }
 
     // 7. Elevated Platform 3 (10, 3.0, -12, size 8x8) -> bounds [6, 14], [-16, -8]
-    if (pos.y < 2.85) {
+    if (pos.y < 2.98) {
       this.resolveBox(pos, radius, 6, 14, -16, -8);
     }
 
     // 8. High-Altitude Sky Platforms Horizontal Side Collision (Covers full character height up to helmet)
     for (const sp of this.skyPlatforms) {
-      if (pos.y + 1.92 >= sp.bottomY && pos.y < sp.topY - 0.05) {
+      if (pos.y + 2.05 >= sp.bottomY && pos.y < sp.topY - 0.05) {
         this.resolveBox(pos, radius, sp.minX, sp.maxX, sp.minZ, sp.maxZ);
       }
     }

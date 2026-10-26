@@ -12,8 +12,15 @@ export class IsometricCamera {
   // Offsets and FOVs for each play mode
   // 1. Isometric: 45° azimuth, elevated diamond angle, low FOV for orthographic-like projection
   private readonly isoOffset: THREE.Vector3 = new THREE.Vector3(-15, 18, 15);
-  // 2. 3rd Person: Set quite far back and slightly elevated so full body & surroundings are visible
+  // Mobile: closer isometric camera for compact mobile screens
+  private readonly isoOffsetMobile: THREE.Vector3 = new THREE.Vector3(-10.5, 12.6, 10.5);
+
+  // 2. 3rd Person: full body & surroundings visible
   private readonly thirdPersonOffset: THREE.Vector3 = new THREE.Vector3(0, 4.5, 12.0);
+  // Mobile: closer third person over-the-shoulder action view
+  private readonly thirdPersonOffsetMobile: THREE.Vector3 = new THREE.Vector3(0, 3.2, 7.8);
+
+  public isMobile: boolean = false;
 
   private currentOffset: THREE.Vector3 = new THREE.Vector3();
   private targetOffset: THREE.Vector3 = new THREE.Vector3();
@@ -27,26 +34,46 @@ export class IsometricCamera {
   private shakeDuration: number = 0;
 
   constructor(aspect: number) {
+    this.isMobile = this.checkMobile();
     this.camera = new THREE.PerspectiveCamera(28, aspect, 0.1, 400);
-    this.targetOffset.copy(this.isoOffset);
-    this.currentOffset.copy(this.isoOffset);
+    const initialOffset = this.getActiveIsoOffset();
+    this.targetOffset.copy(initialOffset);
+    this.currentOffset.copy(initialOffset);
     this.camera.position.copy(this.currentOffset);
+  }
+
+  private checkMobile(): boolean {
+    return typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 1024);
+  }
+
+  private getActiveIsoOffset(): THREE.Vector3 {
+    return this.isMobile ? this.isoOffsetMobile : this.isoOffset;
+  }
+
+  private getActiveThirdPersonOffset(): THREE.Vector3 {
+    return this.isMobile ? this.thirdPersonOffsetMobile : this.thirdPersonOffset;
   }
 
   public onResize(width: number, height: number) {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+
+    const wasMobile = this.isMobile;
+    this.isMobile = this.checkMobile();
+    if (wasMobile !== this.isMobile) {
+      this.targetOffset.copy(this.mode === CameraMode.ISOMETRIC ? this.getActiveIsoOffset() : this.getActiveThirdPersonOffset());
+    }
   }
 
   public toggleMode(): CameraMode {
     if (this.mode === CameraMode.ISOMETRIC) {
       this.mode = CameraMode.THIRD_PERSON;
-      this.targetOffset.copy(this.thirdPersonOffset);
+      this.targetOffset.copy(this.getActiveThirdPersonOffset());
       this.targetFov = 52;
       this.targetLookElevation = 1.4;
     } else {
       this.mode = CameraMode.ISOMETRIC;
-      this.targetOffset.copy(this.isoOffset);
+      this.targetOffset.copy(this.getActiveIsoOffset());
       this.targetFov = 28;
       this.targetLookElevation = 1.2;
     }

@@ -177,13 +177,6 @@ class DetourGame {
     this.initMenuParticles();
     this.setupUIHandlers();
 
-    // Pre-compile scene and shaders to prevent any stutter or hitches during gameplay
-    try {
-      this.renderer.compile(this.scene, this.cameraSystem.camera);
-    } catch {
-      // Fallback
-    }
-
     window.addEventListener('resize', () => this.onResize());
 
     // Start render loop
@@ -259,11 +252,13 @@ class DetourGame {
     // Main Menu Buttons Navigation (Exact Reference Image 1)
     const menuButtons = document.querySelectorAll<HTMLButtonElement>('.menu-btn');
     menuButtons.forEach((btn) => {
-      btn.addEventListener('mouseenter', () => {
+      const activate = () => {
         menuButtons.forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
-        this.audio.playMenuClick();
-      });
+        try { this.audio.playMenuClick(); } catch {}
+      };
+      btn.addEventListener('pointerenter', activate);
+      btn.addEventListener('pointerdown', activate);
     });
 
     const startBtn = document.getElementById('btn-menu-start');
@@ -271,14 +266,15 @@ class DetourGame {
       let lastStartTime = 0;
       const handleStart = (e: Event) => {
         const now = performance.now();
-        if (now - lastStartTime < 350) return;
+        if (now - lastStartTime < 300) return;
         lastStartTime = now;
         e.preventDefault();
+        e.stopPropagation();
         this.audio.playGameStart();
         this.toggleMainMenu(false);
       };
+      startBtn.addEventListener('pointerdown', handleStart);
       startBtn.addEventListener('click', handleStart);
-      startBtn.addEventListener('touchend', handleStart);
     }
 
     const otherBtnIds = ['btn-menu-load', 'btn-menu-settings', 'btn-menu-quit'];
@@ -288,13 +284,14 @@ class DetourGame {
         let lastClickTime = 0;
         const handleClick = (e: Event) => {
           const now = performance.now();
-          if (now - lastClickTime < 350) return;
+          if (now - lastClickTime < 300) return;
           lastClickTime = now;
           e.preventDefault();
+          e.stopPropagation();
           this.audio.playMenuClick();
         };
+        b.addEventListener('pointerdown', handleClick);
         b.addEventListener('click', handleClick);
-        b.addEventListener('touchend', handleClick);
       }
     });
 
@@ -304,15 +301,15 @@ class DetourGame {
       let lastMenuOpenTime = 0;
       const handleOpenMenu = (e: Event) => {
         const now = performance.now();
-        if (now - lastMenuOpenTime < 350) return;
+        if (now - lastMenuOpenTime < 300) return;
         lastMenuOpenTime = now;
         e.preventDefault();
         e.stopPropagation();
         this.audio.playMenuClick();
         this.toggleMainMenu(true);
       };
+      openMenuBtn.addEventListener('pointerdown', handleOpenMenu);
       openMenuBtn.addEventListener('click', handleOpenMenu);
-      openMenuBtn.addEventListener('touchend', handleOpenMenu);
     }
 
     // Camera Mode Toggle Button
@@ -321,13 +318,14 @@ class DetourGame {
       let lastCamToggle = 0;
       const handleCamToggle = (e: Event) => {
         const now = performance.now();
-        if (now - lastCamToggle < 350) return;
+        if (now - lastCamToggle < 300) return;
         lastCamToggle = now;
         e.preventDefault();
+        e.stopPropagation();
         this.toggleCameraMode();
       };
+      camToggleBtn.addEventListener('pointerdown', handleCamToggle);
       camToggleBtn.addEventListener('click', handleCamToggle);
-      camToggleBtn.addEventListener('touchend', handleCamToggle);
     }
 
     // Escape Key Menu Toggle

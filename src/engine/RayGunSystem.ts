@@ -72,7 +72,7 @@ export class RayGunSystem {
   private audio: AudioManager;
   private character: CharacterController;
   private world: IsometricWorld;
-  private plants: PlantManager;
+  public plants?: PlantManager;
 
   // Gun Collectible in World
   public isGunCollected: boolean = false;
@@ -672,7 +672,7 @@ export class RayGunSystem {
     this.raycaster.far = 60.0;
 
     const aliveTargetMeshes = this.targets.filter(t => t.isAlive).map(t => t.mesh);
-    const colliders: THREE.Object3D[] = [...this.world.terrainColliders, this.plants.getGroup(), ...aliveTargetMeshes];
+    const colliders: THREE.Object3D[] = [...this.world.terrainColliders, ...aliveTargetMeshes];
     const hits = this.raycaster.intersectObjects(colliders, true);
 
     let hitPoint: THREE.Vector3;
@@ -1186,13 +1186,13 @@ export class RayGunSystem {
     this.scene.add(this.laserGuideGroup);
 
     // 1. Glowing electric blue laser beam line (unit length cylinder oriented along +Z, enhanced thickness)
-    const lineGeo = new THREE.CylinderGeometry(0.012, 0.012, 1.0, 8);
+    const lineGeo = new THREE.CylinderGeometry(0.022, 0.022, 1.0, 8);
     lineGeo.translate(0, 0.5, 0);
     lineGeo.rotateX(Math.PI / 2);
     this.laserLineMat = new THREE.MeshBasicMaterial({
-      color: 0x2563eb,
+      color: 0x0099ff,
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.72,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -1201,11 +1201,11 @@ export class RayGunSystem {
     this.laserGuideGroup.add(this.laserLineMesh);
 
     // 2. Glowing target dot at hit point
-    const dotGeo = new THREE.SphereGeometry(0.05, 12, 12);
+    const dotGeo = new THREE.SphereGeometry(0.065, 12, 12);
     this.laserDotMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
+      color: 0x00d4ff,
       transparent: true,
-      opacity: 0.90,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -1214,9 +1214,9 @@ export class RayGunSystem {
     this.laserGuideGroup.add(this.laserDotMesh);
 
     // 3. Lock-on pulsing target ring
-    const ringGeo = new THREE.RingGeometry(0.14, 0.25, 20);
+    const ringGeo = new THREE.RingGeometry(0.16, 0.28, 20);
     this.laserRingMat = new THREE.MeshBasicMaterial({
-      color: 0xfacc15,
+      color: 0x00f0ff,
       transparent: true,
       opacity: 0.0,
       side: THREE.DoubleSide,
@@ -1257,27 +1257,40 @@ export class RayGunSystem {
         const overlap = minDist - dist;
 
         if (target.isAir) {
-          // Stationary aerial drone: push character back
+          // Stationary aerial drone: push character firmly back
           pos.x -= nx * overlap;
           pos.z -= nz * overlap;
-        } else {
-          // Dynamic Ground Ball: Transfer momentum and push ball forward!
-          tPos.x += nx * overlap * 0.85;
-          tPos.z += nz * overlap * 0.85;
-          pos.x -= nx * overlap * 0.15;
-          pos.z -= nz * overlap * 0.15;
-
-          let pushSpeed = 4.2;
           if (playerVelocity) {
             const dot = playerVelocity.x * nx + playerVelocity.z * nz;
-            if (dot > 0.1) {
-              pushSpeed = dot * 1.5 + 2.5;
+            if (dot > 0) {
+              playerVelocity.x -= nx * dot;
+              playerVelocity.z -= nz * dot;
             }
+          }
+        } else {
+          // Dynamic Ground Ball: Transfer momentum, deflect player velocity, push ball forward!
+          tPos.x += nx * overlap * 0.55;
+          tPos.z += nz * overlap * 0.55;
+          pos.x -= nx * overlap * 0.45;
+          pos.z -= nz * overlap * 0.45;
+
+          if (playerVelocity) {
+            const dot = playerVelocity.x * nx + playerVelocity.z * nz;
+            if (dot > 0.01) {
+              playerVelocity.x -= nx * dot * 0.95;
+              playerVelocity.z -= nz * dot * 0.95;
+            }
+          }
+
+          let pushSpeed = 4.8;
+          if (playerVelocity) {
+            const mag = Math.hypot(playerVelocity.x, playerVelocity.z);
+            pushSpeed = Math.max(pushSpeed, mag * 1.8 + 2.5);
           }
 
           target.velocity.x += nx * pushSpeed;
           target.velocity.z += nz * pushSpeed;
-          target.velocity.y = Math.max(target.velocity.y, 1.2);
+          target.velocity.y = Math.max(target.velocity.y, 1.8);
 
           try {
             this.audio.playBallKick(pushSpeed);
@@ -1291,17 +1304,16 @@ export class RayGunSystem {
 
   /**
    * Evaluates all alive target spheres for Soft Aim Magnetism and Generous Hit Radius.
-   * If a target is within the magnetic forward cone (28 deg) or generous hit radius (2.8m),
-   * returns the target and the snapped direction directly toward it.
+   * Wide magnetic forward cone (40 deg) and generous hit radius (4.2m) ensure effortless hits.
    */
   private findBestMagnetizedTarget(muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): { target: TargetSphere; direction: THREE.Vector3 } | null {
     let bestTarget: TargetSphere | null = null;
     let bestScore = Infinity; // Lower score = better target
     let bestDir = new THREE.Vector3();
 
-    const maxAimDistance = 55.0;
-    const maxPerpDistance = 2.8; // Generous hit radius in meters
-    const maxConeAngleRad = 28.0 * (Math.PI / 180); // 28 degree wide forward cone
+    const maxAimDistance = 65.0;
+    const maxPerpDistance = 4.2; // Generous hit radius in meters
+    const maxConeAngleRad = 40.0 * (Math.PI / 180); // 40 degree wide comfortable forward cone
 
     for (const target of this.targets) {
       if (!target.isAlive) continue;
@@ -1320,11 +1332,11 @@ export class RayGunSystem {
 
       // Check generous hit radius OR magnetic angular cone
       const isWithinHitRadius = perpDist <= maxPerpDistance;
-      const isWithinMagnetCone = angleRad <= maxConeAngleRad && perpDist <= (maxPerpDistance + projDist * 0.22);
+      const isWithinMagnetCone = angleRad <= maxConeAngleRad && perpDist <= (maxPerpDistance + projDist * 0.28);
 
       if (isWithinHitRadius || isWithinMagnetCone) {
         // Prioritize targets closest to the center line
-        const score = angleRad * 2.0 + perpDist * 0.5 + projDist * 0.03;
+        const score = angleRad * 2.0 + perpDist * 0.4 + projDist * 0.02;
         if (score < bestScore) {
           bestScore = score;
           bestTarget = target;
@@ -1357,11 +1369,11 @@ export class RayGunSystem {
     const aimDir = magnetized ? magnetized.direction : rawDir;
     this.isTargetLocked = !!magnetized;
 
-    // Raycast to find laser endpoint against colliders
+    // Raycast against terrain and targets ONLY (excludes heavy plants hierarchy to eliminate any stutter/freeze)
     const aliveTargets = this.targets.filter(t => t.isAlive).map(t => t.mesh);
-    const colliders = [...this.world.terrainColliders, this.plants.getGroup(), ...aliveTargets];
+    const colliders = [...this.world.terrainColliders, ...aliveTargets];
     this.raycaster.set(muzzlePos, aimDir);
-    this.raycaster.far = 50.0;
+    this.raycaster.far = 55.0;
     const hits = this.raycaster.intersectObjects(colliders, true);
 
     let endPoint: THREE.Vector3;
@@ -1386,10 +1398,10 @@ export class RayGunSystem {
 
     // Lock-on visual feedback
     if (this.isTargetLocked) {
-      // Vibrant amber/gold lock-on
-      this.laserLineMat.color.setHex(0xfacc15);
-      this.laserLineMat.opacity = 0.65;
-      this.laserDotMat.color.setHex(0xfacc15);
+      // Vibrant electric cyan lock-on
+      this.laserLineMat.color.setHex(0x00f0ff);
+      this.laserLineMat.opacity = 0.90;
+      this.laserDotMat.color.setHex(0x00ffff);
       this.laserDotMesh.scale.setScalar(1.5);
 
       this.laserLockRing.position.copy(endPoint);
@@ -1398,14 +1410,15 @@ export class RayGunSystem {
       } else {
         this.laserLockRing.quaternion.copy(this.character.group.quaternion);
       }
-      this.laserLockRing.scale.set(1.0, 1.0, 1.0);
-      this.laserRingMat.opacity = 0.85;
+      this.laserLockRing.scale.set(1.1, 1.1, 1.1);
+      (this.laserLockRing.material as THREE.MeshBasicMaterial).color.setHex(0x00e5ff);
+      (this.laserLockRing.material as THREE.MeshBasicMaterial).opacity = 0.92;
       this.laserLockRing.rotation.z += dt * 3.5;
     } else {
-      // Vibrant electric royal blue laser guide
-      this.laserLineMat.color.setHex(0x2563eb);
-      this.laserLineMat.opacity = 0.52;
-      this.laserDotMat.color.setHex(0x38bdf8);
+      // Vibrant electric sky-blue laser guide
+      this.laserLineMat.color.setHex(0x0099ff);
+      this.laserLineMat.opacity = 0.72;
+      this.laserDotMat.color.setHex(0x00d4ff);
       this.laserDotMesh.scale.setScalar(1.1);
       this.laserLockRing.scale.set(0, 0, 0);
       this.laserRingMat.opacity = 0.0;
